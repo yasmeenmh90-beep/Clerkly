@@ -1,0 +1,27 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+venv/
+.venv/
+
+# Local databases and backups
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Installed packages and local files
+*.pkg
+
+# macOS and editors
+.DS_Store
+.vscode/
+.idea/
