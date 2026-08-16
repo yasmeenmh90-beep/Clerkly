@@ -4,8 +4,12 @@ import { mockTasks } from "@/mock/data"
 import { TaskStatusBadge, PriorityBadge } from "../ui/badges"
 import { motion } from "framer-motion"
 import { FileText, IndianRupee, PenTool, ArrowRight, ChevronRight } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 export function PriorityTasks() {
+  const router = useRouter();
+
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col h-full">
       <div className="p-5 border-b border-border flex justify-between items-center bg-muted/10">
@@ -13,9 +17,9 @@ export function PriorityTasks() {
           <h2 className="text-lg font-semibold text-foreground tracking-tight">Needs Attention</h2>
           <p className="text-xs text-muted-foreground mt-1">Tasks requiring your immediate action</p>
         </div>
-        <button className="text-sm text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors">
+        <Link href="/tasks" className="text-sm text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors">
           View All <ArrowRight className="w-4 h-4" />
-        </button>
+        </Link>
       </div>
       
       <div className="divide-y divide-border flex-1">
@@ -25,6 +29,7 @@ export function PriorityTasks() {
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.2, delay: i * 0.05 }}
+            onClick={() => router.push('/tasks')}
             className="p-5 hover:bg-muted/50 transition-colors group cursor-pointer relative"
           >
             <div className="flex justify-between items-start mb-2">
