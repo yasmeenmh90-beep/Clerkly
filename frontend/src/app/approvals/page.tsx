@@ -1,31 +1,83 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { mockTasks } from "@/mock/data"
-import { Task } from "@/types"
-import { Check, X, FileText, IndianRupee, PenTool, AlertCircle } from "lucide-react"
+import { Approval } from "@/types"
+import { Check, X, FileText, IndianRupee, PenTool, AlertCircle, Loader2 } from "lucide-react"
+import { getApprovals, approveRequest, rejectRequest } from "@/lib/api"
 
 export default function ApprovalsPage() {
-  const [approvals, setApprovals] = useState<Task[]>(
-    mockTasks.filter(t => t.status === "waiting_approval")
-  )
+  const [approvals, setApprovals] = useState<Approval[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   
   const [toast, setToast] = useState<{ message: string, type: "success" | "error" } | null>(null)
+  const [processingId, setProcessingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchApprovals = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+        const data = await getApprovals()
+        setApprovals(data)
+      } catch (err) {
+        setError("Unable to load approvals. Please try again.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchApprovals()
+  }, [])
 
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ message, type })
     setTimeout(() => setToast(null), 3000)
   }
 
-  const handleApprove = (taskId: string) => {
-    setApprovals(prev => prev.filter(t => t.task_id !== taskId))
-    showToast("Request approved successfully", "success")
+  const handleApprove = async (approvalId: string) => {
+    try {
+      setProcessingId(approvalId)
+      await approveRequest(approvalId)
+      setApprovals(prev => prev.filter(a => a.approval_id !== approvalId))
+      showToast("Request approved successfully", "success")
+    } catch (err) {
+      showToast("Failed to approve request", "error")
+    } finally {
+      setProcessingId(null)
+    }
   }
 
-  const handleReject = (taskId: string) => {
-    setApprovals(prev => prev.filter(t => t.task_id !== taskId))
-    showToast("Request rejected", "error")
+  const handleReject = async (approvalId: string) => {
+    try {
+      setProcessingId(approvalId)
+      await rejectRequest(approvalId)
+      setApprovals(prev => prev.filter(a => a.approval_id !== approvalId))
+      showToast("Request rejected", "error")
+    } catch (err) {
+      showToast("Failed to reject request", "error")
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-muted-foreground space-y-4">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p>Loading approvals...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-danger space-y-4">
+        <AlertCircle className="w-10 h-10" />
+        <p className="font-medium">{error}</p>
+        <button onClick={() => window.location.reload()} className="px-4 py-2 mt-2 text-sm bg-muted text-foreground rounded-lg hover:bg-muted/80">Try Again</button>
+      </div>
+    )
   }
 
   return (
@@ -55,12 +107,12 @@ export default function ApprovalsPage() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20, scale: 0.95 }}
               transition={{ duration: 0.2, delay: i * 0.05 }}
-              key={item.task_id}
+              key={item.approval_id}
               className="bg-card border border-border rounded-xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6"
             >
               <div className="flex items-start gap-4 flex-1">
-                <div className={`p-3 rounded-xl border ${item.requires_payment ? 'bg-warning/10 border-warning/20 text-warning' : 'bg-primary/10 border-primary/20 text-primary'}`}>
-                  {item.requires_payment ? <IndianRupee className="w-5 h-5" /> : <PenTool className="w-5 h-5" />}
+                <div className={`p-3 rounded-xl border ${item.type === "payment" ? 'bg-warning/10 border-warning/20 text-warning' : 'bg-primary/10 border-primary/20 text-primary'}`}>
+                  {item.type === "payment" ? <IndianRupee className="w-5 h-5" /> : <PenTool className="w-5 h-5" />}
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground text-base mb-1">{item.title}</h3>
@@ -70,7 +122,7 @@ export default function ApprovalsPage() {
                     <span>Created: {new Date(item.created_at).toLocaleDateString()}</span>
                   </div>
                   
-                  {item.requires_payment && (
+                  {item.type === "payment" && item.amount && (
                     <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted border border-border/50 text-sm font-medium text-foreground">
                       Amount: <span className="text-warning">₹{item.amount}</span>
                     </div>
@@ -78,16 +130,23 @@ export default function ApprovalsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-3 w-full md:w-auto relative">
+                {processingId === item.approval_id && (
+                  <div className="absolute inset-0 bg-card/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                  </div>
+                )}
                 <button
-                  onClick={() => handleReject(item.task_id)}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-card border border-border text-foreground hover:bg-danger/10 hover:text-danger hover:border-danger/30 transition-colors text-sm font-medium"
+                  onClick={() => handleReject(item.approval_id)}
+                  disabled={processingId === item.approval_id}
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-card border border-border text-foreground hover:bg-danger/10 hover:text-danger hover:border-danger/30 transition-colors text-sm font-medium disabled:opacity-50"
                 >
                   <X className="w-4 h-4" /> Reject
                 </button>
                 <button
-                  onClick={() => handleApprove(item.task_id)}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium shadow-sm"
+                  onClick={() => handleApprove(item.approval_id)}
+                  disabled={processingId === item.approval_id}
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium shadow-sm disabled:opacity-50"
                 >
                   <Check className="w-4 h-4" /> Approve
                 </button>

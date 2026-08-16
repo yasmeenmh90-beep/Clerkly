@@ -1,21 +1,17 @@
 "use client"
 
-import { Search, Bell, Clock } from "lucide-react"
+import { Search, Bell, Clock, Loader2 } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-
-// Mock notifications
-const initialNotifications = [
-  { id: 1, title: "Document Processed", desc: "Rental Agreement.pdf has been analyzed by AI.", time: "2m ago", read: false, type: "info" },
-  { id: 2, title: "Approval Required", desc: "Electricity Bill payment of ₹150 needs your approval.", time: "1h ago", read: false, type: "warning" },
-  { id: 3, title: "Task Completed", desc: "Government Form Submission was marked as completed.", time: "3h ago", read: true, type: "success" },
-]
+import { getNotifications } from "@/lib/api"
+import { Notification } from "@/types"
 
 export function Header() {
   const pathname = usePathname();
   const [showNotifications, setShowNotifications] = useState(false)
-  const [notifications, setNotifications] = useState(initialNotifications)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [isLoading, setIsLoading] = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
   
   const getPageTitle = () => {
@@ -30,7 +26,22 @@ export function Header() {
   
   const { title, subtitle } = getPageTitle();
 
-  const unreadCount = notifications.filter(n => !n.read).length
+  const unreadCount = notifications.filter(n => !n.is_read).length
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        setIsLoading(true)
+        const data = await getNotifications()
+        setNotifications(data)
+      } catch (err) {
+        console.error("Failed to load notifications", err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchNotifications()
+  }, [])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -43,11 +54,11 @@ export function Header() {
   }, [])
 
   const markAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
   }
 
-  const markAsRead = (id: number) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+  const markAsRead = (id: string) => {
+    setNotifications(prev => prev.map(n => n.notification_id === id ? { ...n, is_read: true } : n))
   }
 
   return (
@@ -106,8 +117,12 @@ export function Header() {
                   )}
                 </div>
 
-                <div className="max-h-96 overflow-y-auto">
-                  {notifications.length === 0 ? (
+                <div className="max-h-96 overflow-y-auto relative min-h-24">
+                  {isLoading ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-card/50">
+                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                    </div>
+                  ) : notifications.length === 0 ? (
                     <div className="p-8 text-center text-muted-foreground">
                       <Bell className="w-8 h-8 mx-auto mb-2 opacity-20" />
                       <p className="text-sm">No notifications yet.</p>
@@ -116,19 +131,19 @@ export function Header() {
                     <div className="divide-y divide-border">
                       {notifications.map(notif => (
                         <div 
-                          key={notif.id}
-                          onClick={() => markAsRead(notif.id)}
-                          className={`p-4 hover:bg-muted/50 transition-colors cursor-pointer flex gap-3 ${!notif.read ? 'bg-primary/5' : ''}`}
+                          key={notif.notification_id}
+                          onClick={() => markAsRead(notif.notification_id)}
+                          className={`p-4 hover:bg-muted/50 transition-colors cursor-pointer flex gap-3 ${!notif.is_read ? 'bg-primary/5' : ''}`}
                         >
-                          <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${!notif.read ? 'bg-primary' : 'bg-transparent'}`} />
+                          <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${!notif.is_read ? 'bg-primary' : 'bg-transparent'}`} />
                           <div className="flex-1 space-y-1">
                             <div className="flex justify-between items-start">
-                              <p className={`text-sm font-medium ${!notif.read ? 'text-foreground' : 'text-foreground/80'}`}>{notif.title}</p>
+                              <p className={`text-sm font-medium ${!notif.is_read ? 'text-foreground' : 'text-foreground/80'}`}>{notif.title}</p>
                               <span className="text-xs text-muted-foreground whitespace-nowrap ml-2 flex items-center gap-1">
-                                <Clock className="w-3 h-3" /> {notif.time}
+                                <Clock className="w-3 h-3" /> {notif.timestamp}
                               </span>
                             </div>
-                            <p className="text-xs text-muted-foreground leading-relaxed">{notif.desc}</p>
+                            <p className="text-xs text-muted-foreground leading-relaxed">{notif.description}</p>
                           </div>
                         </div>
                       ))}

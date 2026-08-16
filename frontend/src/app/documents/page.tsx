@@ -3,6 +3,8 @@
 import { useState, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { UploadCloud, File, X, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
+import { uploadDocument } from "@/lib/api"
+import { Document } from "@/types"
 
 type UploadState = "idle" | "uploading" | "success" | "error"
 
@@ -11,6 +13,7 @@ export default function DocumentsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadState, setUploadState] = useState<UploadState>("idle")
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadedDoc, setUploadedDoc] = useState<Document | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleDrag = (e: React.DragEvent) => {
@@ -43,12 +46,14 @@ export default function DocumentsPage() {
     setSelectedFile(file)
     setUploadState("idle")
     setUploadProgress(0)
+    setUploadedDoc(null)
   }
 
   const removeFile = () => {
     setSelectedFile(null)
     setUploadState("idle")
     setUploadProgress(0)
+    setUploadedDoc(null)
     if (inputRef.current) inputRef.current.value = ""
   }
 
@@ -60,21 +65,27 @@ export default function DocumentsPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
-  const simulateUpload = () => {
+  const handleUpload = async () => {
     if (!selectedFile) return
     setUploadState("uploading")
     setUploadProgress(0)
 
+    // Simulate progress while the real API call happens
     const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setUploadState("success")
-          return 100
-        }
-        return prev + 10
-      })
+      setUploadProgress(prev => Math.min(prev + 10, 90))
     }, 200)
+
+    try {
+      const doc = await uploadDocument(selectedFile)
+      clearInterval(interval)
+      setUploadProgress(100)
+      setUploadState("success")
+      setUploadedDoc(doc)
+    } catch (err) {
+      clearInterval(interval)
+      setUploadState("error")
+      setUploadProgress(0)
+    }
   }
 
   return (
@@ -172,16 +183,17 @@ export default function DocumentsPage() {
                   <motion.div 
                     className="h-full bg-primary"
                     initial={{ width: 0 }}
-                    animate={{ width: \`\${uploadProgress}%\` }}
+                    animate={{ width: `${uploadProgress}%` }}
                     transition={{ duration: 0.2 }}
                   />
                 </div>
               </div>
             )}
             
-            {uploadState === "success" && (
-              <div className="mt-4 pt-3 border-t border-border flex items-center gap-2 text-sm text-success font-medium">
-                <CheckCircle2 className="w-4 h-4" /> File uploaded successfully
+            {uploadState === "success" && uploadedDoc && (
+              <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-sm text-success font-medium">
+                <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> File uploaded successfully</span>
+                <span className="text-muted-foreground font-normal text-xs">ID: {uploadedDoc.document_id}</span>
               </div>
             )}
 
@@ -194,7 +206,7 @@ export default function DocumentsPage() {
             {uploadState === "idle" && (
               <div className="mt-4 pt-4 border-t border-border flex justify-end">
                 <button
-                  onClick={simulateUpload}
+                  onClick={handleUpload}
                   className="px-5 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors shadow-sm w-full sm:w-auto"
                 >
                   Upload File

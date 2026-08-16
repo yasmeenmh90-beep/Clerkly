@@ -1,19 +1,39 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { mockTasks } from "@/mock/data"
 import { Task, TaskStatus, TaskPriority } from "@/types"
 import { TaskStatusBadge, PriorityBadge } from "@/components/ui/badges"
-import { Search, Filter, FileText, IndianRupee, PenTool, X, Clock } from "lucide-react"
+import { Search, Filter, FileText, IndianRupee, PenTool, X, Clock, Loader2, AlertCircle } from "lucide-react"
+import { getTasks, updateTaskStatus } from "@/lib/api"
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>(mockTasks)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all")
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "all">("all")
   
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [isUpdating, setIsUpdating] = useState(false)
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+        const data = await getTasks()
+        setTasks(data)
+      } catch (err) {
+        setError("Unable to load tasks. Please try again.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchTasks()
+  }, [])
 
   const filteredTasks = useMemo(() => {
     return tasks.filter(task => {
@@ -25,11 +45,39 @@ export default function TasksPage() {
     })
   }, [tasks, searchQuery, statusFilter, priorityFilter])
 
-  const handleStatusChange = (taskId: string, newStatus: TaskStatus) => {
-    setTasks(prev => prev.map(t => t.task_id === taskId ? { ...t, status: newStatus } : t))
-    if (selectedTask?.task_id === taskId) {
-      setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null)
+  const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
+    try {
+      setIsUpdating(true)
+      const updatedTask = await updateTaskStatus(taskId, newStatus)
+      setTasks(prev => prev.map(t => t.task_id === taskId ? updatedTask : t))
+      if (selectedTask?.task_id === taskId) {
+        setSelectedTask(updatedTask)
+      }
+    } catch (err) {
+      // In a real app, we might show a toast here. For now, silent fail or minimal UI.
+      console.error(err)
+    } finally {
+      setIsUpdating(false)
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-muted-foreground space-y-4">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p>Loading tasks...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-danger space-y-4">
+        <AlertCircle className="w-10 h-10" />
+        <p className="font-medium">{error}</p>
+        <button onClick={() => window.location.reload()} className="px-4 py-2 mt-2 text-sm bg-muted text-foreground rounded-lg hover:bg-muted/80">Try Again</button>
+      </div>
+    )
   }
 
   return (
@@ -109,8 +157,8 @@ export default function TasksPage() {
                 </span>
                 
                 <div className="flex gap-2">
-                  {task.requires_payment && <IndianRupee className="w-4 h-4 text-warning" title="Requires Payment" />}
-                  {task.requires_signature && <PenTool className="w-4 h-4 text-primary" title="Requires Signature" />}
+                  {task.requires_payment && <span title="Requires Payment"><IndianRupee className="w-4 h-4 text-warning" /></span>}
+                  {task.requires_signature && <span title="Requires Signature"><PenTool className="w-4 h-4 text-primary" /></span>}
                 </div>
               </div>
             </motion.div>
@@ -186,7 +234,12 @@ export default function TasksPage() {
                   </div>
                 )}
 
-                <div className="space-y-3 pt-4 border-t border-border">
+                <div className="space-y-3 pt-4 border-t border-border relative">
+                  {isUpdating && (
+                    <div className="absolute inset-0 bg-card/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                    </div>
+                  )}
                   <h4 className="text-sm font-semibold text-foreground">Change Status</h4>
                   <div className="flex flex-wrap gap-2">
                     {(["pending", "in_progress", "waiting_approval", "completed"] as TaskStatus[]).map((status) => (

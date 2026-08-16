@@ -1,9 +1,10 @@
 "use client"
 
-import { mockActivities } from "@/mock/data"
 import { motion } from "framer-motion"
-import { Upload, CheckCircle2, FileWarning, IndianRupee, Play, Clock, Search } from "lucide-react"
-import { useState } from "react"
+import { Upload, CheckCircle2, FileWarning, IndianRupee, Play, Clock, Search, Loader2, AlertCircle } from "lucide-react"
+import { useState, useEffect } from "react"
+import { getActivity } from "@/lib/api"
+import { Activity } from "@/types"
 
 const typeIcons = {
   document_uploaded: Upload,
@@ -22,12 +23,51 @@ const typeColors = {
 }
 
 export default function ActivityPage() {
+  const [activities, setActivities] = useState<Activity[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  
   const [searchQuery, setSearchQuery] = useState("")
 
-  const filteredActivities = mockActivities.filter(activity => 
+  useEffect(() => {
+    const fetchActivity = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+        const data = await getActivity()
+        setActivities(data)
+      } catch (err) {
+        setError("Unable to load activity. Please try again.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchActivity()
+  }, [])
+
+  const filteredActivities = activities.filter(activity => 
     activity.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
     activity.description.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-muted-foreground space-y-4">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p>Loading activity...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-danger space-y-4">
+        <AlertCircle className="w-10 h-10" />
+        <p className="font-medium">{error}</p>
+        <button onClick={() => window.location.reload()} className="px-4 py-2 mt-2 text-sm bg-muted text-foreground rounded-lg hover:bg-muted/80">Try Again</button>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-8">
@@ -93,3 +133,4 @@ export default function ActivityPage() {
     </div>
   )
 }
+
