@@ -54,8 +54,12 @@ export function RecentActivity() {
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
         ) : activities.length === 0 ? (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-            No recent activity.
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4">
+            <div className="w-12 h-12 bg-muted/50 rounded-full flex items-center justify-center mb-3">
+              <Play className="w-5 h-5 text-muted-foreground opacity-50" />
+            </div>
+            <p className="text-sm font-medium text-foreground">No recent activity</p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">Things are quiet right now. Check back later.</p>
           </div>
         ) : (
           <div className="relative border-l border-border/60 ml-3 space-y-6 pt-2">

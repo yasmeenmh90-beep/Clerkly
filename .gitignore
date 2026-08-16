@@ -220,3 +220,5 @@ __marimo__/
 # Next.js
 .next/
 *.tsbuildinfo
+# Node.js
+node_modules/

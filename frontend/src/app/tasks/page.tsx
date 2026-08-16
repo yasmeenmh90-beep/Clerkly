@@ -124,11 +124,14 @@ export default function TasksPage() {
         <AnimatePresence mode="popLayout">
           {filteredTasks.length === 0 && (
             <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="col-span-full py-12 text-center text-muted-foreground bg-card border border-border rounded-xl"
+              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+              className="col-span-full py-20 text-center text-muted-foreground bg-card border border-border rounded-xl shadow-sm"
             >
-              <Filter className="w-8 h-8 mx-auto mb-3 opacity-20" />
-              <p>No tasks found matching your filters.</p>
+              <div className="w-16 h-16 mx-auto mb-4 bg-muted/50 rounded-full flex items-center justify-center">
+                <Filter className="w-8 h-8 opacity-40" />
+              </div>
+              <h3 className="text-lg font-medium text-foreground mb-1">No tasks found</h3>
+              <p className="text-sm max-w-sm mx-auto">We couldn't find any tasks matching your filters. Try adjusting your search or clearing filters.</p>
             </motion.div>
           )}
           

@@ -91,12 +91,14 @@ export default function ApprovalsPage() {
         <AnimatePresence mode="popLayout">
           {approvals.length === 0 && (
             <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="py-16 text-center text-muted-foreground bg-card border border-border rounded-xl"
+              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+              className="py-20 text-center text-muted-foreground bg-card border border-border rounded-xl shadow-sm"
             >
-              <Check className="w-12 h-12 mx-auto mb-4 text-success opacity-50" />
-              <h3 className="text-lg font-medium text-foreground mb-1">All caught up!</h3>
-              <p>You have no pending approvals at this time.</p>
+              <div className="w-16 h-16 mx-auto mb-4 bg-success/10 rounded-full flex items-center justify-center">
+                <Check className="w-8 h-8 text-success" />
+              </div>
+              <h3 className="text-lg font-medium text-foreground mb-1">No approvals waiting</h3>
+              <p className="text-sm max-w-sm mx-auto">You're all caught up! There are no pending requests requiring your attention.</p>
             </motion.div>
           )}
 

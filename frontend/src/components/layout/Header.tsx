@@ -123,9 +123,12 @@ export function Header() {
                       <Loader2 className="w-5 h-5 animate-spin text-primary" />
                     </div>
                   ) : notifications.length === 0 ? (
-                    <div className="p-8 text-center text-muted-foreground">
-                      <Bell className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                      <p className="text-sm">No notifications yet.</p>
+                    <div className="p-10 text-center text-muted-foreground flex flex-col items-center">
+                      <div className="w-12 h-12 bg-muted/50 rounded-full flex items-center justify-center mb-3">
+                        <Bell className="w-6 h-6 opacity-40" />
+                      </div>
+                      <h4 className="text-sm font-medium text-foreground mb-1">No new notifications</h4>
+                      <p className="text-xs max-w-[200px]">You're all caught up. We'll notify you when something happens.</p>
                     </div>
                   ) : (
                     <div className="divide-y divide-border">

@@ -91,10 +91,16 @@ export default function ActivityPage() {
 
       <div className="bg-card border border-border rounded-xl shadow-sm p-6 md:p-8">
         {filteredActivities.length === 0 ? (
-          <div className="py-12 text-center text-muted-foreground">
-            <Clock className="w-12 h-12 mx-auto mb-4 opacity-20" />
-            <p>No activity found matching your search.</p>
-          </div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="py-16 text-center text-muted-foreground"
+          >
+            <div className="w-16 h-16 mx-auto mb-4 bg-muted/50 rounded-full flex items-center justify-center">
+              <Clock className="w-8 h-8 opacity-40" />
+            </div>
+            <h3 className="text-lg font-medium text-foreground mb-1">No recent activity</h3>
+            <p className="text-sm max-w-sm mx-auto">There are no activities matching your current search.</p>
+          </motion.div>
         ) : (
           <div className="relative border-l-2 border-border/60 ml-4 md:ml-8 space-y-10 py-4">
             {filteredActivities.map((activity, i) => {

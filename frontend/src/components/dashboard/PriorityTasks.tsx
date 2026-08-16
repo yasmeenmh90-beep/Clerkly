@@ -2,7 +2,7 @@
 
 import { TaskStatusBadge, PriorityBadge } from "../ui/badges"
 import { motion } from "framer-motion"
-import { FileText, IndianRupee, PenTool, ArrowRight, ChevronRight, Loader2 } from "lucide-react"
+import { FileText, IndianRupee, PenTool, ArrowRight, ChevronRight, Loader2, CheckCircle2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
@@ -47,8 +47,12 @@ export function PriorityTasks() {
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
         ) : tasks.length === 0 ? (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-            No priority tasks found.
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4">
+            <div className="w-12 h-12 bg-success/10 rounded-full flex items-center justify-center mb-3">
+              <CheckCircle2 className="w-5 h-5 text-success opacity-80" />
+            </div>
+            <p className="text-sm font-medium text-foreground">No priority tasks</p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">You are all caught up on urgent items.</p>
           </div>
         ) : (
           tasks.slice(0, 4).map((task, i) => (

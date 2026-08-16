@@ -15,7 +15,7 @@ export const mockTasks: Task[] = [
   },
   {
     task_id: "t-102",
-    title: "Insurance Renewal",
+    title: "Insurance Renewal Signature",
     status: "pending",
     document_type: "Insurance Policy",
     deadline: "2026-08-20",
@@ -27,7 +27,7 @@ export const mockTasks: Task[] = [
   },
   {
     task_id: "t-103",
-    title: "Rental Agreement",
+    title: "Office Lease Agreement",
     status: "in_progress",
     document_type: "Contract",
     deadline: "2026-08-25",
@@ -38,14 +38,59 @@ export const mockTasks: Task[] = [
   },
   {
     task_id: "t-104",
-    title: "Government Form Submission",
+    title: "Q3 Tax Filing Documents",
     status: "completed",
-    document_type: "Official Form",
+    document_type: "Tax Form",
     deadline: "2026-08-10",
     requires_signature: false,
     requires_payment: false,
-    priority: "low",
+    priority: "medium",
     created_at: "2026-08-01T14:20:00Z"
+  },
+  {
+    task_id: "t-105",
+    title: "Software Subscription Invoice",
+    status: "waiting_approval",
+    document_type: "Invoice",
+    deadline: "2026-08-17",
+    requires_signature: false,
+    requires_payment: true,
+    amount: 299,
+    priority: "medium",
+    created_at: "2026-08-16T08:00:00Z"
+  },
+  {
+    task_id: "t-106",
+    title: "New Employee NDA",
+    status: "pending",
+    document_type: "Legal Document",
+    deadline: "2026-08-22",
+    requires_signature: true,
+    requires_payment: false,
+    priority: "low",
+    created_at: "2026-08-16T09:45:00Z"
+  },
+  {
+    task_id: "t-107",
+    title: "Quarterly Audit Report Review",
+    status: "in_progress",
+    document_type: "Report",
+    deadline: "2026-08-30",
+    requires_signature: false,
+    requires_payment: false,
+    priority: "high",
+    created_at: "2026-08-13T16:20:00Z"
+  },
+  {
+    task_id: "t-108",
+    title: "Marketing Budget Approval",
+    status: "waiting_approval",
+    document_type: "Financial Plan",
+    deadline: "2026-08-19",
+    requires_signature: true,
+    requires_payment: false,
+    priority: "high",
+    created_at: "2026-08-16T11:00:00Z"
   }
 ];
 
@@ -53,29 +98,43 @@ export const mockActivities: Activity[] = [
   {
     activity_id: "a-1",
     title: "Payment Approved",
-    description: "Water bill payment of ₹45 approved by Sarah.",
-    timestamp: "2 hours ago",
+    description: "Cloud hosting bill payment of ₹450 approved by admin.",
+    timestamp: "10 mins ago",
     type: "payment_approved"
   },
   {
     activity_id: "a-2",
     title: "Approval Requested",
-    description: "Electricity bill requires your approval.",
-    timestamp: "5 hours ago",
+    description: "Software Subscription Invoice requires your approval.",
+    timestamp: "2 hours ago",
     type: "approval_requested"
   },
   {
     activity_id: "a-3",
     title: "Document Uploaded",
-    description: "Rental Agreement.pdf was uploaded.",
-    timestamp: "1 day ago",
+    description: "New_Employee_NDA_v2.pdf was uploaded.",
+    timestamp: "4 hours ago",
     type: "document_uploaded"
+  },
+  {
+    activity_id: "a-4",
+    title: "Task Completed",
+    description: "Q3 Tax Filing Documents have been verified and processed.",
+    timestamp: "1 day ago",
+    type: "task_completed"
+  },
+  {
+    activity_id: "a-5",
+    title: "AI Processing Complete",
+    description: "Marketing Budget Approval document has been successfully summarized by Clerkly AI.",
+    timestamp: "1 day ago",
+    type: "task_created"
   }
 ];
 
 export const mockStats = {
-  total: 12,
-  pending: 4,
+  total: 8,
+  pending: 2,
   waitingApproval: 3,
-  completed: 5
+  completed: 1
 };
