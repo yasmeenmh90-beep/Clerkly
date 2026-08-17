@@ -6,6 +6,8 @@ import { Task, TaskStatus, TaskPriority } from "@/types"
 import { TaskStatusBadge, PriorityBadge } from "@/components/ui/badges"
 import { Search, Filter, FileText, IndianRupee, PenTool, X, Clock, Loader2, AlertCircle } from "lucide-react"
 import { getTasks, updateTaskStatus } from "@/lib/api"
+import { NewTaskModal } from "@/components/dashboard/NewTaskModal"
+import { EditTaskModal } from "@/components/dashboard/EditTaskModal"
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -18,6 +20,8 @@ export default function TasksPage() {
   
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false)
+  const [isEditTaskModalOpen, setIsEditTaskModalOpen] = useState(false)
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -117,6 +121,13 @@ export default function TasksPage() {
             <option value="medium">Medium</option>
             <option value="high">High</option>
           </select>
+          
+          <button 
+            onClick={() => setIsNewTaskModalOpen(true)}
+            className="h-10 px-4 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition-colors shadow-sm active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center justify-center whitespace-nowrap"
+          >
+            + New Task
+          </button>
         </div>
       </div>
 
@@ -261,8 +272,47 @@ export default function TasksPage() {
                   </div>
                 </div>
               </div>
+              <div className="p-4 border-t border-border bg-muted/10 flex justify-end gap-3 shrink-0">
+                <button 
+                  onClick={() => confirm("Are you sure you want to delete this task?") && setSelectedTask(null)}
+                  className="px-4 py-2 border border-danger/30 text-danger hover:bg-danger/10 rounded-lg font-medium text-sm transition-colors mr-auto active:scale-95"
+                >
+                  Delete
+                </button>
+                <button 
+                  onClick={() => setIsEditTaskModalOpen(true)}
+                  className="px-4 py-2 border border-border bg-card hover:bg-muted text-foreground rounded-lg font-medium text-sm transition-colors active:scale-95"
+                >
+                  Edit
+                </button>
+                <button 
+                  onClick={() => setSelectedTask(null)}
+                  className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-medium text-sm transition-colors shadow-sm active:scale-95"
+                >
+                  Done
+                </button>
+              </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {isEditTaskModalOpen && selectedTask && (
+          <EditTaskModal 
+            isOpen={isEditTaskModalOpen}
+            onClose={() => setIsEditTaskModalOpen(false)}
+            onSuccess={() => setIsEditTaskModalOpen(false)}
+            initialData={selectedTask}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {isNewTaskModalOpen && (
+          <NewTaskModal 
+            isOpen={isNewTaskModalOpen}
+            onClose={() => setIsNewTaskModalOpen(false)}
+            onSuccess={() => setIsNewTaskModalOpen(false)}
+          />
         )}
       </AnimatePresence>
     </div>

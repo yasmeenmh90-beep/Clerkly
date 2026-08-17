@@ -9,17 +9,27 @@ import { useState, useEffect } from "react"
 import { getTasks } from "@/lib/api"
 import { Task } from "@/types"
 
-export function PriorityTasks() {
+import { TaskModal } from "./TaskModal"
+
+export function PriorityTasks({ searchQuery }: { searchQuery?: string }) {
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
   useEffect(() => {
     const fetchTasks = async () => {
       try {
         setIsLoading(true)
         const data = await getTasks()
-        setTasks(data)
+        let filtered = data;
+        if (searchQuery) {
+          filtered = filtered.filter(t => 
+            t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            t.document_type.toLowerCase().includes(searchQuery.toLowerCase())
+          )
+        }
+        setTasks(filtered)
       } catch (err) {
         console.error("Failed to load tasks", err)
       } finally {
@@ -27,9 +37,13 @@ export function PriorityTasks() {
       }
     }
     fetchTasks()
-  }, [])
+    
+    window.addEventListener("task-updated", fetchTasks)
+    return () => window.removeEventListener("task-updated", fetchTasks)
+  }, [searchQuery])
 
   return (
+    <>
     <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col h-full">
       <div className="p-5 border-b border-border flex justify-between items-center bg-muted/10">
         <div>
@@ -51,8 +65,8 @@ export function PriorityTasks() {
             <div className="w-12 h-12 bg-success/10 rounded-full flex items-center justify-center mb-3">
               <CheckCircle2 className="w-5 h-5 text-success opacity-80" />
             </div>
-            <p className="text-sm font-medium text-foreground">No priority tasks</p>
-            <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">You are all caught up on urgent items.</p>
+            <p className="text-sm font-medium text-foreground">{searchQuery ? "No matching priority tasks" : "No priority tasks"}</p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">{searchQuery ? "Try a different search term" : "You are all caught up on urgent items."}</p>
           </div>
         ) : (
           tasks.slice(0, 4).map((task, i) => (
@@ -61,8 +75,8 @@ export function PriorityTasks() {
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.2, delay: i * 0.05 }}
-              onClick={() => router.push('/tasks')}
-              className="p-5 hover:bg-muted/50 transition-colors group cursor-pointer relative"
+              onClick={() => setSelectedTask(task)}
+              className="p-5 hover:bg-muted/40 transition-all duration-200 active:scale-[0.99] group cursor-pointer relative focus-visible:outline-none focus-visible:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             >
               <div className="flex justify-between items-start mb-2">
                 <div className="flex items-start gap-3">
@@ -70,7 +84,7 @@ export function PriorityTasks() {
                     <FileText className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="font-medium text-foreground group-hover:text-primary transition-colors text-sm">{task.title}</h3>
+                    <h3 className="font-medium text-foreground group-hover:text-primary transition-all duration-200 group-hover:translate-x-0.5 text-sm">{task.title}</h3>
                     <p className="text-xs text-muted-foreground mt-1">{task.document_type} • Due {new Date(task.deadline).toLocaleDateString()}</p>
                   </div>
                 </div>
@@ -103,6 +117,12 @@ export function PriorityTasks() {
         )}
       </div>
     </div>
+    
+    <TaskModal 
+      task={selectedTask} 
+      onClose={() => setSelectedTask(null)} 
+    />
+    </>
   )
 }
 

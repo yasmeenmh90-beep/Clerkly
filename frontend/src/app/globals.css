@@ -20,6 +20,7 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-ring: var(--ring);
 }
 
 :root {
@@ -40,6 +41,7 @@
   --success-foreground: #ffffff;
   --warning: #f59e0b;
   --warning-foreground: #ffffff;
+  --ring: #0ea5e9;
 }
 
 .dark {
@@ -48,6 +50,7 @@
   --card: #121214;
   --card-foreground: #fafafa;
   --border: #27272a;
+  --ring: #0ea5e9;
   --primary: #38bdf8;
   --primary-foreground: #09090b;
   --muted: #18181b;

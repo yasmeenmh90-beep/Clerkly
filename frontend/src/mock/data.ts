@@ -138,3 +138,30 @@ export const mockStats = {
   waitingApproval: 3,
   completed: 1
 };
+
+export const mockDocuments = [
+  {
+    document_id: "doc-1",
+    filename: "Annual_Report_2025.pdf",
+    file_size: 4500000,
+    file_type: "pdf",
+    uploaded_at: "2026-08-17T10:00:00Z",
+    status: "processing"
+  },
+  {
+    document_id: "doc-2",
+    filename: "Vendor_Contract_Q4.docx",
+    file_size: 1200000,
+    file_type: "docx",
+    uploaded_at: "2026-08-17T11:15:00Z",
+    status: "processing"
+  },
+  {
+    document_id: "doc-3",
+    filename: "Tax_Summary_Q3.pdf",
+    file_size: 250000,
+    file_type: "pdf",
+    uploaded_at: "2026-08-16T14:20:00Z",
+    status: "processed"
+  }
+];

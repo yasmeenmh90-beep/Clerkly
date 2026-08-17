@@ -22,7 +22,7 @@ const typeColors = {
   task_completed: "bg-success/10 text-success border-success/20"
 }
 
-export function RecentActivity() {
+export function RecentActivity({ searchQuery }: { searchQuery?: string }) {
   const [activities, setActivities] = useState<Activity[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -31,7 +31,14 @@ export function RecentActivity() {
       try {
         setIsLoading(true)
         const data = await getActivity()
-        setActivities(data)
+        let filtered = data;
+        if (searchQuery) {
+          filtered = filtered.filter(a => 
+            a.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            a.description.toLowerCase().includes(searchQuery.toLowerCase())
+          )
+        }
+        setActivities(filtered)
       } catch (err) {
         console.error("Failed to load activities", err)
       } finally {
@@ -39,7 +46,7 @@ export function RecentActivity() {
       }
     }
     fetchActivity()
-  }, [])
+  }, [searchQuery])
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col h-full">
@@ -58,8 +65,8 @@ export function RecentActivity() {
             <div className="w-12 h-12 bg-muted/50 rounded-full flex items-center justify-center mb-3">
               <Play className="w-5 h-5 text-muted-foreground opacity-50" />
             </div>
-            <p className="text-sm font-medium text-foreground">No recent activity</p>
-            <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">Things are quiet right now. Check back later.</p>
+            <p className="text-sm font-medium text-foreground">{searchQuery ? "No matching activity" : "No recent activity"}</p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">{searchQuery ? "Try a different search term" : "Things are quiet right now. Check back later."}</p>
           </div>
         ) : (
           <div className="relative border-l border-border/60 ml-3 space-y-6 pt-2">

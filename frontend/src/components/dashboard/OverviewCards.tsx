@@ -3,22 +3,23 @@
 import { motion } from "framer-motion"
 import { CheckSquare, Clock, FileWarning, CheckCircle2, Loader2 } from "lucide-react"
 import { useState, useEffect } from "react"
-import { getTasks } from "@/lib/api"
+import { getTasks, getDocuments } from "@/lib/api"
 
 export function OverviewCards() {
-  const [stats, setStats] = useState({ total: 0, pending: 0, waitingApproval: 0, completed: 0 })
+  const [stats, setStats] = useState({ pendingApprovals: 0, activeTasks: 0, docsProcessing: 0, completedTasks: 0 })
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true)
-        const tasks = await getTasks()
+        const [tasks, docs] = await Promise.all([getTasks(), getDocuments()])
+        
         setStats({
-          total: tasks.length,
-          pending: tasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length,
-          waitingApproval: tasks.filter(t => t.status === 'waiting_approval').length,
-          completed: tasks.filter(t => t.status === 'completed').length,
+          pendingApprovals: tasks.filter(t => t.status === 'waiting_approval').length,
+          activeTasks: tasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length,
+          docsProcessing: docs.filter(d => d.status === 'processing').length,
+          completedTasks: tasks.filter(t => t.status === 'completed').length,
         })
       } catch (err) {
         console.error("Failed to load stats", err)
@@ -26,14 +27,18 @@ export function OverviewCards() {
         setIsLoading(false)
       }
     }
-    fetchStats()
+    fetchData()
+    
+    // Listen to updates from TaskModal
+    window.addEventListener("task-updated", fetchData)
+    return () => window.removeEventListener("task-updated", fetchData)
   }, [])
 
   const cards = [
-    { title: "Total Tasks", value: stats.total, icon: CheckSquare, color: "text-primary", bg: "bg-primary/10", change: "+2 from yesterday" },
-    { title: "Pending", value: stats.pending, icon: Clock, color: "text-warning", bg: "bg-warning/10", change: "Requires action" },
-    { title: "Waiting Approval", value: stats.waitingApproval, icon: FileWarning, color: "text-foreground", bg: "bg-accent", change: "Blocked" },
-    { title: "Completed", value: stats.completed, icon: CheckCircle2, color: "text-success", bg: "bg-success/10", change: "This week" }
+    { title: "Pending Approvals", value: stats.pendingApprovals, icon: FileWarning, color: "text-warning", bg: "bg-warning/10", change: "Requires your review" },
+    { title: "Active Tasks", value: stats.activeTasks, icon: Clock, color: "text-primary", bg: "bg-primary/10", change: "Currently in progress" },
+    { title: "Documents Processing", value: stats.docsProcessing, icon: CheckSquare, color: "text-foreground", bg: "bg-accent", change: "AI is analyzing" },
+    { title: "Completed Tasks", value: stats.completedTasks, icon: CheckCircle2, color: "text-success", bg: "bg-success/10", change: "Last 7 days" }
   ]
 
   return (
@@ -44,7 +49,7 @@ export function OverviewCards() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: i * 0.1 }}
-          className="bg-card border border-border rounded-xl p-5 shadow-sm hover:shadow-md transition-all hover:border-primary/30 group relative overflow-hidden h-32"
+          className="bg-card border border-border/60 rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 ease-out hover:-translate-y-1 hover:border-primary/40 group relative overflow-hidden h-32 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {isLoading ? (
             <div className="absolute inset-0 flex items-center justify-center">

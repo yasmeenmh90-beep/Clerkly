@@ -75,6 +75,16 @@ export function Header() {
             type="text" 
             placeholder="Search tasks, documents..." 
             className="w-full h-9 pl-10 pr-4 rounded-full bg-background border border-border text-sm focus:outline-none focus:border-primary transition-all text-foreground"
+            onChange={(e) => {
+              const params = new URLSearchParams(window.location.search);
+              if (e.target.value) {
+                params.set('q', e.target.value);
+              } else {
+                params.delete('q');
+              }
+              window.history.replaceState({}, '', `${pathname}?${params.toString()}`);
+              window.dispatchEvent(new Event('search-updated'));
+            }}
           />
         </div>
         
@@ -161,6 +171,12 @@ export function Header() {
               </motion.div>
             )}
           </AnimatePresence>
+        </div>
+
+        <div className="relative hidden sm:block ml-2">
+          <a href="/profile" className="w-9 h-9 rounded-full overflow-hidden border border-border/60 hover:border-primary/50 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center justify-center bg-primary/10 text-primary font-bold text-sm">
+             AJ
+          </a>
         </div>
       </div>
     </header>
