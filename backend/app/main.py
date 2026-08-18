@@ -6,11 +6,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auth import router as auth_router
 from app.api.intake import router as intake_router
+from app.api.payments import (
+    router as payments_router,
+    webhook_router,
+)
 from app.api.tasks import router as tasks_router
 from app.config import settings
 from app.database import SessionLocal
 from app.models.task_record import TaskRecord
-
 
 logging.basicConfig(
     level=getattr(
@@ -104,6 +107,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(tasks_router)
 app.include_router(intake_router)
+app.include_router(payments_router)
+app.include_router(webhook_router)
 
 
 @app.get("/")

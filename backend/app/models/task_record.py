@@ -1,16 +1,14 @@
 from datetime import date
+from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, Float, ForeignKey, String
-from sqlalchemy.orm import Mapped, mapped_column
-
-from app.database import Base
-
-
-from datetime import date
-from typing import Optional
-
-from sqlalchemy import Boolean, Date, Float, ForeignKey, String
+from sqlalchemy import (
+    Boolean,
+    Date,
+    ForeignKey,
+    Numeric,
+    String,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -43,6 +41,7 @@ class TaskRecord(Base):
     )
 
     source: Mapped[str] = mapped_column(String)
+
     status: Mapped[str] = mapped_column(
         String,
         default="pending",
@@ -68,17 +67,45 @@ class TaskRecord(Base):
         default=False,
     )
 
-    payment_amount: Mapped[Optional[float]] = mapped_column(
-        Float,
+    payment_amount: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(
+            precision=12,
+            scale=2,
+        ),
         nullable=True,
     )
 
     currency: Mapped[Optional[str]] = mapped_column(
-        String,
+        String(length=3),
         nullable=True,
     )
 
     approval_required: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
+    )
+
+    # Stripe payment tracking
+    payment_provider: Mapped[Optional[str]] = mapped_column(
+        String(length=50),
+        nullable=True,
+    )
+
+    provider_session_id: Mapped[Optional[str]] = mapped_column(
+        String(length=255),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
+
+    payment_intent_id: Mapped[Optional[str]] = mapped_column(
+        String(length=255),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
+
+    payment_status: Mapped[Optional[str]] = mapped_column(
+        String(length=50),
+        nullable=True,
     )

@@ -15,6 +15,19 @@ DEVELOPMENT_SECRET = (
 )
 
 
+def get_optional_environment_variable(
+    variable_name: str,
+) -> str | None:
+    value = os.getenv(variable_name)
+
+    if value is None:
+        return None
+
+    cleaned_value = value.strip()
+
+    return cleaned_value or None
+
+
 def get_positive_int(
     variable_name: str,
     default: int,
@@ -87,6 +100,10 @@ class Settings:
     bedrock_region: str
     bedrock_temperature: float
 
+    stripe_secret_key: str | None
+    stripe_webhook_secret: str | None
+
+    frontend_url: str
     cors_origins: tuple[str, ...]
 
     log_level: str
@@ -94,6 +111,10 @@ class Settings:
     @property
     def max_upload_size_bytes(self) -> int:
         return self.max_upload_size_mb * 1024 * 1024
+
+    @property
+    def stripe_is_configured(self) -> bool:
+        return self.stripe_secret_key is not None
 
 
 def load_settings() -> Settings:
@@ -154,6 +175,20 @@ def load_settings() -> Settings:
             "BEDROCK_TEMPERATURE",
             0.1,
         ),
+        stripe_secret_key=(
+            get_optional_environment_variable(
+                "STRIPE_SECRET_KEY"
+            )
+        ),
+        stripe_webhook_secret=(
+            get_optional_environment_variable(
+                "STRIPE_WEBHOOK_SECRET"
+            )
+        ),
+        frontend_url=os.getenv(
+            "FRONTEND_URL",
+            "http://localhost:3000",
+        ).rstrip("/"),
         cors_origins=get_cors_origins(),
         log_level=os.getenv(
             "LOG_LEVEL",

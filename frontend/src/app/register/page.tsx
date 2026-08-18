@@ -11,6 +11,7 @@ import {
   Loader2,
   Lock,
   Mail,
+  UserRound,
 } from "lucide-react"
 
 import Link from "next/link"
@@ -26,10 +27,11 @@ import {
 import {
   ApiError,
   login,
+  register,
 } from "@/lib/api"
 
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter()
 
   const {
@@ -37,6 +39,9 @@ export default function LoginPage() {
     isLoading: isCheckingAuthentication,
     refreshUser,
   } = useAuth()
+
+  const [fullName, setFullName] =
+    useState("")
 
   const [email, setEmail] =
     useState("")
@@ -74,6 +79,12 @@ export default function LoginPage() {
       setIsSubmitting(true)
       setError(null)
 
+      await register({
+  email,
+  password,
+  full_name: fullName.trim(),
+})
+
       await login(email, password)
       await refreshUser()
 
@@ -83,7 +94,7 @@ export default function LoginPage() {
         setError(requestError.message)
       } else {
         setError(
-          "Unable to log in. Please try again.",
+          "Unable to create your account. Please try again.",
         )
       }
     } finally {
@@ -101,11 +112,11 @@ export default function LoginPage() {
           </div>
 
           <h1 className="text-3xl font-bold text-foreground">
-            Welcome to Clerkly
+            Create your account
           </h1>
 
           <p className="mt-2 text-sm text-muted-foreground">
-            Sign in to manage your paperwork tasks
+            Start managing paperwork securely
           </p>
         </div>
 
@@ -123,6 +134,33 @@ export default function LoginPage() {
               <span>{error}</span>
             </div>
           )}
+
+
+          <div className="space-y-2">
+            <label
+              htmlFor="full-name"
+              className="text-sm font-medium text-foreground"
+            >
+              Full name
+            </label>
+
+            <div className="relative">
+              <UserRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+              <input
+  id="full-name"
+  type="text"
+  required
+  autoComplete="name"
+  value={fullName}
+  onChange={(event) =>
+    setFullName(event.target.value)
+  }
+  placeholder="Your name"
+  className="h-11 w-full rounded-lg border border-border bg-background pl-10 pr-4 text-sm text-foreground outline-none transition-colors focus:border-primary"
+/>
+            </div>
+          </div>
 
 
           <div className="space-y-2">
@@ -167,12 +205,13 @@ export default function LoginPage() {
                 id="password"
                 type="password"
                 required
-                autoComplete="current-password"
+                minLength={8}
+                autoComplete="new-password"
                 value={password}
                 onChange={(event) =>
                   setPassword(event.target.value)
                 }
-                placeholder="Enter your password"
+                placeholder="At least 8 characters"
                 className="h-11 w-full rounded-lg border border-border bg-background pl-10 pr-4 text-sm text-foreground outline-none transition-colors focus:border-primary"
               />
             </div>
@@ -189,19 +228,19 @@ export default function LoginPage() {
             )}
 
             {isSubmitting
-              ? "Signing in..."
-              : "Sign In"}
+              ? "Creating account..."
+              : "Create Account"}
           </button>
 
 
           <p className="text-center text-sm text-muted-foreground">
-            Do not have an account?{" "}
+            Already have an account?{" "}
 
             <Link
-              href="/register"
+              href="/login"
               className="font-medium text-primary hover:underline"
             >
-              Create account
+              Sign in
             </Link>
           </p>
         </form>

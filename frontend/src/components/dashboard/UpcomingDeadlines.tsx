@@ -1,117 +1,325 @@
 "use client"
 
-import { TaskStatusBadge, PriorityBadge } from "../ui/badges"
-import { motion } from "framer-motion"
-import { Calendar, AlertCircle, ArrowRight, Loader2, SearchX } from "lucide-react"
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
+
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useState, useEffect } from "react"
-import { getTasks } from "@/lib/api"
-import { Task } from "@/types"
 
-import { TaskModal } from "./TaskModal"
+import {
+  useRouter,
+} from "next/navigation"
 
-export function UpcomingDeadlines({ searchQuery }: { searchQuery?: string }) {
-  const router = useRouter();
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+import {
+  motion,
+} from "framer-motion"
+
+import {
+  AlertCircle,
+  ArrowRight,
+  Calendar,
+  Loader2,
+  SearchX,
+} from "lucide-react"
+
+import type {
+  Task,
+} from "@/types"
+
+import {
+  getTasks,
+} from "@/lib/api"
+
+import {
+  TaskStatusBadge,
+} from "@/components/ui/badges"
+
+
+interface UpcomingDeadlinesProps {
+  searchQuery?: string
+}
+
+
+function parseDeadline(
+  deadline: string,
+): Date {
+  return new Date(`${deadline}T00:00:00`)
+}
+
+
+function formatDeadline(
+  deadline: string,
+): string {
+  const parsedDeadline =
+    parseDeadline(deadline)
+
+  if (Number.isNaN(parsedDeadline.getTime())) {
+    return deadline
+  }
+
+  return parsedDeadline.toLocaleDateString(
+    undefined,
+    {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    },
+  )
+}
+
+
+function isUrgentDeadline(
+  deadline: string,
+): boolean {
+  const deadlineTime =
+    parseDeadline(deadline).getTime()
+
+  if (Number.isNaN(deadlineTime)) {
+    return false
+  }
+
+  const difference =
+    deadlineTime - Date.now()
+
+  return (
+    difference <=
+    3 * 24 * 60 * 60 * 1000
+  )
+}
+
+
+export function UpcomingDeadlines({
+  searchQuery = "",
+}: UpcomingDeadlinesProps) {
+  const router = useRouter()
+
+  const [tasks, setTasks] =
+    useState<Task[]>([])
+
+  const [isLoading, setIsLoading] =
+    useState(true)
+
 
   useEffect(() => {
-    const fetchTasks = async () => {
+    async function fetchTasks(): Promise<void> {
       try {
         setIsLoading(true)
-        const data = await getTasks()
-        let upcoming = data
-          .filter(t => t.status !== "completed")
-          .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
-        
-        if (searchQuery) {
-          upcoming = upcoming.filter(t => 
-            t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-            t.document_type.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-        }
-        
-        setTasks(upcoming)
-      } catch (err) {
-        console.error("Failed to load tasks", err)
+
+        const data = await getTasks({
+          page: 1,
+          page_size: 100,
+        })
+
+        setTasks(data)
+      } catch (error) {
+        console.error(
+          "Failed to load upcoming deadlines",
+          error,
+        )
       } finally {
         setIsLoading(false)
       }
     }
-    fetchTasks()
-    
-    window.addEventListener("task-updated", fetchTasks)
-    return () => window.removeEventListener("task-updated", fetchTasks)
-  }, [searchQuery])
+
+
+    function handleTaskUpdate(): void {
+      void fetchTasks()
+    }
+
+
+    void fetchTasks()
+
+    window.addEventListener(
+      "task-updated",
+      handleTaskUpdate,
+    )
+
+    return () => {
+      window.removeEventListener(
+        "task-updated",
+        handleTaskUpdate,
+      )
+    }
+  }, [])
+
+
+  const upcomingTasks = useMemo(() => {
+    const normalizedSearch =
+      searchQuery.trim().toLowerCase()
+
+    return tasks
+      .filter((task) => {
+        if (
+          !task.deadline ||
+          task.status === "completed" ||
+          task.status === "rejected"
+        ) {
+          return false
+        }
+
+        return (
+          normalizedSearch.length === 0 ||
+          task.title
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          task.source
+            .toLowerCase()
+            .includes(normalizedSearch) ||
+          (task.description ?? "")
+            .toLowerCase()
+            .includes(normalizedSearch)
+        )
+      })
+      .sort((firstTask, secondTask) => {
+        return (
+          parseDeadline(
+            firstTask.deadline as string,
+          ).getTime() -
+          parseDeadline(
+            secondTask.deadline as string,
+          ).getTime()
+        )
+      })
+  }, [
+    tasks,
+    searchQuery,
+  ])
+
 
   return (
-    <>
-    <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col h-full">
-      <div className="p-5 border-b border-border flex justify-between items-center bg-muted/10">
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="flex items-center justify-between border-b border-border bg-muted/10 p-5">
         <div>
-          <h2 className="text-lg font-semibold text-foreground tracking-tight">Upcoming Deadlines</h2>
-          <p className="text-xs text-muted-foreground mt-1">Tasks approaching their due date</p>
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">
+            Upcoming Deadlines
+          </h2>
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            Tasks approaching their due date
+          </p>
         </div>
-        <Link href="/tasks" className="text-sm text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors">
-          View All <ArrowRight className="w-4 h-4" />
+
+        <Link
+          href="/tasks"
+          className="flex items-center gap-1 text-sm font-medium text-primary transition-colors hover:text-primary/80"
+        >
+          View All
+
+          <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
-      
-      <div className="flex-1 relative min-h-[200px] p-5">
+
+
+      <div className="relative min-h-[200px] flex-1 p-5">
         {isLoading ? (
           <div className="absolute inset-0 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
-        ) : tasks.length === 0 ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4">
-            <div className="w-12 h-12 bg-muted/50 rounded-full flex items-center justify-center mb-3">
-              {searchQuery ? <SearchX className="w-5 h-5 text-muted-foreground opacity-50" /> : <Calendar className="w-5 h-5 text-muted-foreground opacity-50" />}
+        ) : upcomingTasks.length === 0 ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted/50">
+              {searchQuery ? (
+                <SearchX className="h-5 w-5 text-muted-foreground opacity-50" />
+              ) : (
+                <Calendar className="h-5 w-5 text-muted-foreground opacity-50" />
+              )}
             </div>
-            <p className="text-sm font-medium text-foreground">{searchQuery ? "No matching deadlines" : "No upcoming deadlines"}</p>
-            <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">{searchQuery ? "Try a different search term" : "You have plenty of time."}</p>
+
+            <p className="text-sm font-medium text-foreground">
+              {searchQuery
+                ? "No matching deadlines"
+                : "No upcoming deadlines"}
+            </p>
+
+            <p className="mt-1 max-w-[220px] text-xs text-muted-foreground">
+              {searchQuery
+                ? "Try a different search term."
+                : "No incomplete tasks currently have a deadline."}
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
-            {tasks.slice(0, 4).map((task, i) => {
-              const isUrgent = new Date(task.deadline).getTime() - new Date().getTime() < 3 * 24 * 60 * 60 * 1000;
-              return (
-                <motion.div 
-                  key={task.task_id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: i * 0.05 }}
-                  onClick={() => setSelectedTask(task)}
-                  className="flex items-center justify-between p-4 rounded-xl border border-border/60 hover:border-primary/50 hover:bg-muted/30 transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isUrgent ? 'bg-danger/10 text-danger' : 'bg-muted text-muted-foreground'}`}>
-                      {isUrgent ? <AlertCircle className="w-5 h-5" /> : <Calendar className="w-5 h-5" />}
+            {upcomingTasks
+              .slice(0, 4)
+              .map((task, index) => {
+                const deadline =
+                  task.deadline as string
+
+                const isUrgent =
+                  isUrgentDeadline(deadline)
+
+                return (
+                  <motion.button
+                    type="button"
+                    key={task.task_id}
+                    initial={{
+                      opacity: 0,
+                      y: 10,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                    }}
+                    transition={{
+                      duration: 0.2,
+                      delay: index * 0.05,
+                    }}
+                    onClick={() =>
+                      router.push("/tasks")
+                    }
+                    className="group flex w-full items-center justify-between gap-4 rounded-xl border border-border/60 p-4 text-left transition-all hover:border-primary/50 hover:bg-muted/30"
+                  >
+                    <div className="flex min-w-0 items-center gap-4">
+                      <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                          isUrgent
+                            ? "bg-danger/10 text-danger"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {isUrgent ? (
+                          <AlertCircle className="h-5 w-5" />
+                        ) : (
+                          <Calendar className="h-5 w-5" />
+                        )}
+                      </div>
+
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-medium text-foreground transition-colors group-hover:text-primary">
+                          {task.title}
+                        </h3>
+
+                        <p className="mt-0.5 text-xs capitalize text-muted-foreground">
+                          {task.source}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">{task.title}</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">{task.document_type}</p>
+
+
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <span
+                        className={`text-xs font-semibold ${
+                          isUrgent
+                            ? "text-danger"
+                            : "text-foreground"
+                        }`}
+                      >
+                        Due{" "}
+                        {formatDeadline(deadline)}
+                      </span>
+
+                      <TaskStatusBadge
+                        status={task.status}
+                      />
                     </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <span className={`text-xs font-semibold ${isUrgent ? 'text-danger' : 'text-foreground'}`}>
-                      Due {new Date(task.deadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                    </span>
-                    <PriorityBadge priority={task.priority} />
-                  </div>
-                </motion.div>
-              )
-            })}
+                  </motion.button>
+                )
+              })}
           </div>
         )}
       </div>
     </div>
-    
-    <TaskModal 
-      task={selectedTask} 
-      onClose={() => setSelectedTask(null)} 
-    />
-    </>
   )
 }

@@ -1,24 +1,48 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import { ThemeProvider } from "@/components/ui/theme-provider";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { Header } from "@/components/layout/Header";
+import type {
+  Metadata,
+} from "next"
 
-const inter = Inter({ subsets: ["latin"] });
+import {
+  Inter,
+} from "next/font/google"
+
+import "./globals.css"
+
+import {
+  AuthProvider,
+} from "@/components/auth/AuthProvider"
+
+import {
+  AppShell,
+} from "@/components/layout/AppShell"
+
+import {
+  ThemeProvider,
+} from "@/components/ui/theme-provider"
+
+
+const inter = Inter({
+  subsets: ["latin"],
+})
+
 
 export const metadata: Metadata = {
-  title: "Paperwork AI",
-  description: "AI-powered productivity and automation platform",
-};
+  title: "Clerkly",
+  description:
+    "Secure AI-powered paperwork intake, approval, execution, and audit platform",
+}
+
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      suppressHydrationWarning
+    >
       <body className={inter.className}>
         <ThemeProvider
           attribute="class"
@@ -26,17 +50,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="flex h-screen overflow-hidden bg-background">
-            <Sidebar />
-            <div className="flex flex-col flex-1 overflow-hidden">
-              <Header />
-              <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-                {children}
-              </main>
-            </div>
-          </div>
+          <AuthProvider>
+            <AppShell>
+              {children}
+            </AppShell>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
-  );
+  )
 }
