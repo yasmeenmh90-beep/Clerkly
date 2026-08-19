@@ -21,6 +21,9 @@
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-ring: var(--ring);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
 }
 
 :root {
@@ -42,6 +45,9 @@
   --warning: #f59e0b;
   --warning-foreground: #ffffff;
   --ring: #0ea5e9;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.03);
+  --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.06), 0 8px 12px -6px rgb(0 0 0 / 0.04);
 }
 
 .dark {
@@ -63,6 +69,9 @@
   --success-foreground: #09090b;
   --warning: #fbbf24;
   --warning-foreground: #09090b;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.6), 0 8px 12px -6px rgb(0 0 0 / 0.5);
 }
 
 body {
@@ -74,4 +83,13 @@ body {
 
 *, *::before, *::after {
   border-color: var(--border);
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.animate-shimmer {
+  animation: shimmer 2.5s infinite;
 }

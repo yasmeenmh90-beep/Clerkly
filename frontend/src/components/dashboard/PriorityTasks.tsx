@@ -74,9 +74,11 @@ export function PriorityTasks({ searchQuery }: { searchQuery?: string }) {
               key={task.task_id}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.2, delay: i * 0.05 }}
+              whileHover={{ y: -2, scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20, delay: i * 0.05 }}
               onClick={() => setSelectedTask(task)}
-              className="p-5 hover:bg-muted/40 transition-all duration-200 active:scale-[0.99] group cursor-pointer relative focus-visible:outline-none focus-visible:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              className="p-5 hover:bg-muted/40 transition-all duration-200  group cursor-pointer relative focus-visible:outline-none focus-visible:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             >
               <div className="flex justify-between items-start mb-2">
                 <div className="flex items-start gap-3">

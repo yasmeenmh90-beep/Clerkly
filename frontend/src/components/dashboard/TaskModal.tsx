@@ -7,8 +7,23 @@ import { TaskStatusBadge, PriorityBadge } from "../ui/badges"
 import { updateTaskStatus } from "@/lib/api"
 import { useState } from "react"
 
+
+const AnimatedCheck = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <motion.path 
+      initial={{ pathLength: 0 }}
+      animate={{ pathLength: 1 }}
+      transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
+      d="m9 12 2 2 4-4"
+    />
+  </svg>
+)
+
 export function TaskModal({ task, onClose }: { task: Task | null, onClose: () => void }) {
   const [isUpdating, setIsUpdating] = useState(false)
+  const [justCompleted, setJustCompleted] = useState(false)
+  const springTransition: any = { type: "spring", stiffness: 260, damping: 20 }
 
   if (!task) return null;
 
@@ -16,7 +31,12 @@ export function TaskModal({ task, onClose }: { task: Task | null, onClose: () =>
     try {
       setIsUpdating(true)
       await updateTaskStatus(task.task_id, status)
-      onClose() // Close after update
+      if (status === 'completed') {
+        setJustCompleted(true)
+        setTimeout(() => onClose(), 1200)
+      } else {
+        onClose()
+      }
     } catch (err) {
       console.error(err)
     } finally {
@@ -30,16 +50,30 @@ export function TaskModal({ task, onClose }: { task: Task | null, onClose: () =>
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
         onClick={onClose}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={springTransition}
           onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-lg bg-card border border-border/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+          className="w-full max-w-lg bg-card border border-border/60 rounded-2xl shadow-lg overflow-hidden flex flex-col relative"
         >
+          {justCompleted && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="absolute inset-0 z-50 bg-card/80 backdrop-blur-sm flex flex-col items-center justify-center"
+            >
+              <div className="text-success scale-150 mb-4">
+                <AnimatedCheck />
+              </div>
+              <p className="text-lg font-medium text-foreground">Task Completed!</p>
+            </motion.div>
+          )}
           <div className="p-6 border-b border-border flex justify-between items-start">
             <div>
               <div className="flex items-center gap-3 mb-2">

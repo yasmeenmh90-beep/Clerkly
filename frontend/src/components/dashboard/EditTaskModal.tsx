@@ -47,12 +47,19 @@ export function EditTaskModal({ isOpen, onClose, onSuccess, initialData }: EditT
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
+          transition={{ type: "spring", stiffness: 260, damping: 20 }}
+          className="bg-card border border-border/60 rounded-2xl shadow-lg w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
         >
           {showSuccess ? (
             <div className="p-12 flex flex-col items-center justify-center text-center">
@@ -84,7 +91,7 @@ export function EditTaskModal({ isOpen, onClose, onSuccess, initialData }: EditT
                       placeholder="e.g. Q3 Tax Return"
                       value={formData.title}
                       onChange={e => setFormData({...formData, title: e.target.value})}
-                      className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-primary transition-all text-foreground"
+                      className="w-full h-10 px-3 rounded-t-lg border-b border-border/60 bg-background/50 text-sm focus:outline-none bg-[linear-gradient(var(--color-primary),var(--color-primary))] bg-[length:0%_2px] bg-no-repeat bg-bottom focus:bg-[length:100%_2px] transition-all duration-300 text-foreground"
                     />
                   </div>
 
@@ -104,7 +111,7 @@ export function EditTaskModal({ isOpen, onClose, onSuccess, initialData }: EditT
                       <select 
                         value={formData.priority}
                         onChange={e => setFormData({...formData, priority: e.target.value as TaskPriority})}
-                        className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-primary transition-all text-foreground"
+                        className="w-full h-10 px-3 rounded-t-lg border-b border-border/60 bg-background/50 text-sm focus:outline-none bg-[linear-gradient(var(--color-primary),var(--color-primary))] bg-[length:0%_2px] bg-no-repeat bg-bottom focus:bg-[length:100%_2px] transition-all duration-300 text-foreground"
                       >
                         <option value="low">Low</option>
                         <option value="medium">Medium</option>
@@ -118,7 +125,7 @@ export function EditTaskModal({ isOpen, onClose, onSuccess, initialData }: EditT
                         type="date"
                         value={formData.deadline}
                         onChange={e => setFormData({...formData, deadline: e.target.value})}
-                        className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-primary transition-all text-foreground"
+                        className="w-full h-10 px-3 rounded-t-lg border-b border-border/60 bg-background/50 text-sm focus:outline-none bg-[linear-gradient(var(--color-primary),var(--color-primary))] bg-[length:0%_2px] bg-no-repeat bg-bottom focus:bg-[length:100%_2px] transition-all duration-300 text-foreground"
                       />
                     </div>
                   </div>
@@ -130,7 +137,7 @@ export function EditTaskModal({ isOpen, onClose, onSuccess, initialData }: EditT
                       placeholder="e.g. Tax Form, Contract"
                       value={formData.document_type}
                       onChange={e => setFormData({...formData, document_type: e.target.value})}
-                      className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-primary transition-all text-foreground"
+                      className="w-full h-10 px-3 rounded-t-lg border-b border-border/60 bg-background/50 text-sm focus:outline-none bg-[linear-gradient(var(--color-primary),var(--color-primary))] bg-[length:0%_2px] bg-no-repeat bg-bottom focus:bg-[length:100%_2px] transition-all duration-300 text-foreground"
                     />
                   </div>
 
@@ -209,7 +216,7 @@ export function EditTaskModal({ isOpen, onClose, onSuccess, initialData }: EditT
             </>
           )}
         </motion.div>
-      </div>
+      </motion.div>
     </AnimatePresence>
   )
 }

@@ -28,21 +28,39 @@ function DashboardContent() {
     setQuery(searchParams?.get("q") || "")
   }, [searchParams])
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.15 }
+    }
+  }
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: "spring" as any, stiffness: 260, damping: 20 } }
+  }
+
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-8">
+    <motion.div 
+      className="max-w-7xl mx-auto space-y-8 pb-8"
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+    >
       <motion.div 
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
+        variants={itemVariants}
         className="flex flex-col gap-1 mt-2"
       >
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Good morning, Pruthviraj</h1>
         <p className="text-muted-foreground text-sm">Here's what needs your attention today.</p>
       </motion.div>
 
-      <OverviewCards />
+      <motion.div variants={itemVariants}>
+        <OverviewCards />
+      </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 auto-rows-[minmax(400px,auto)]">
+      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6 auto-rows-[minmax(400px,auto)]">
         <div className="lg:col-span-2 flex flex-col gap-6">
           <div className="flex-1">
             <PriorityTasks searchQuery={query} />
@@ -59,8 +77,8 @@ function DashboardContent() {
             <RecentActivity searchQuery={query} />
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }
 

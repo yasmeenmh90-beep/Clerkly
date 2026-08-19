@@ -81,7 +81,9 @@ export function UpcomingDeadlines({ searchQuery }: { searchQuery?: string }) {
                   key={task.task_id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: i * 0.05 }}
+                  whileHover={{ y: -2, scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20, delay: i * 0.05 }}
                   onClick={() => setSelectedTask(task)}
                   className="flex items-center justify-between p-4 rounded-xl border border-border/60 hover:border-primary/50 hover:bg-muted/30 transition-all cursor-pointer group"
                 >

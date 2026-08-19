@@ -312,7 +312,7 @@ export default function DocumentsPage() {
                     <span>{uploadProgress}%</span>
                   </div>
                   <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                    <motion.div className="h-full bg-primary" initial={{ width: 0 }} animate={{ width: `${uploadProgress}%` }} transition={{ duration: 0.2 }} />
+                    <motion.div className="h-full bg-primary" initial={{ width: 0 }} animate={{ width: `${uploadProgress}%` }} transition={{ type: "spring", stiffness: 260, damping: 20 }} />
                   </div>
                 </div>
               )}

@@ -79,7 +79,7 @@ export function RecentActivity({ searchQuery }: { searchQuery?: string }) {
                   key={activity.activity_id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: i * 0.1 }}
+                  whileHover={{ y: -2, scale: 1.01 }} whileTap={{ scale: 0.99 }} transition={{ type: 'spring', stiffness: 260, damping: 20, delay: i * 0.1 }}
                   className="relative pl-6 group"
                 >
                   <div className={`absolute -left-3.5 top-0 w-7 h-7 rounded-full flex items-center justify-center border bg-card ${colorClass} group-hover:scale-110 transition-transform`}>

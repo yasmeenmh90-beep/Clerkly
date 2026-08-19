@@ -59,9 +59,10 @@ export function ProcessingDocuments({ searchQuery }: { searchQuery?: string }) {
               key={doc.document_id}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.2, delay: i * 0.05 }}
-              className="p-5 hover:bg-muted/50 transition-colors group relative"
+              transition={{ type: "spring", stiffness: 260, damping: 20, delay: i * 0.05 }}
+              className="p-5 hover:bg-muted/50 transition-colors group relative overflow-hidden"
             >
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-primary/5 to-transparent animate-shimmer pointer-events-none" />
               <div className="flex items-start gap-4">
                 <div className="p-3 rounded-xl bg-accent/50 text-foreground border border-border relative overflow-hidden shrink-0">
                   <div className="absolute inset-0 bg-primary/10 animate-pulse" />
