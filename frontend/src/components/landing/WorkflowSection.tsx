@@ -1,57 +1,65 @@
 "use client"
 
 import { motion } from 'framer-motion'
-import { Upload, Brain, Eye, CheckCircle2 } from 'lucide-react'
+import { Upload, Brain, FileText, CheckCircle2 } from 'lucide-react'
 
 const spring: any = { type: "spring", stiffness: 260, damping: 20 }
 
 export default function WorkflowSection() {
-  return (
-    <section id="how-it-works" className="py-32 max-w-7xl mx-auto px-6">
-      <motion.div 
-        initial={{ opacity: 0, y: 40 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-60px" }}
-        transition={spring}
-        className="text-center mb-20"
-      >
-        <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-slate-900 mb-6">
-          From paperwork to done.
-        </h2>
-        <p className="text-xl text-slate-500 max-w-2xl mx-auto">
-          A simple workflow that keeps you in control while AI does the heavy lifting.
-        </p>
-      </motion.div>
+  const steps = [
+    { num: '01', title: 'Upload', desc: 'Securely ingest documents in any format.', icon: Upload, color: 'text-indigo-500' },
+    { num: '02', title: 'Understand', desc: 'Clerkly AI scans and classifies unstructured data.', icon: Brain, color: 'text-[#0ea5e9]' },
+    { num: '03', title: 'Extract', desc: 'Key fields are digitized with 99% accuracy.', icon: FileText, color: 'text-blue-500' },
+    { num: '04', title: 'Approve', desc: 'Review exceptions and sync to your systems.', icon: CheckCircle2, color: 'text-emerald-500' },
+  ]
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {[
-          { step: "01", title: "Upload", desc: "Give Clerkly the document.", icon: Upload },
-          { step: "02", title: "Understand", desc: "AI extracts what matters.", icon: Brain },
-          { step: "03", title: "Review", desc: "Review important information before action.", icon: Eye },
-          { step: "04", title: "Complete", desc: "Clerkly keeps the workflow moving.", icon: CheckCircle2 }
-        ].map((item, i) => (
-          <motion.div 
-            key={i}
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-60px" }}
-            transition={{ ...spring, delay: i * 0.1 }}
-            className="h-full"
-          >
-            <div className="bg-white/60 backdrop-blur-xl rounded-[2rem] p-8 shadow-sm border border-slate-100 h-full hover:shadow-md transition-shadow relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-8 opacity-5 text-[80px] font-bold leading-none tracking-tighter select-none pointer-events-none group-hover:scale-110 transition-transform">
-                {item.step}
-              </div>
+  return (
+    <section id="how-it-works" className="py-32 bg-white relative overflow-hidden">
+      <div className="max-w-7xl mx-auto px-6">
+        <motion.div 
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          className="text-center max-w-3xl mx-auto mb-24"
+        >
+          <h2 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 mb-6">
+            The intelligent pipeline.
+          </h2>
+          <p className="text-xl text-slate-500 font-medium">
+            From physical paper to structured database in seconds, not hours.
+          </p>
+        </motion.div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          {steps.map((step, i) => (
+            <motion.div
+              key={step.num}
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ ...spring, delay: i * 0.1 }}
+              className="relative group cursor-default"
+            >
+              {/* Connector Line (Desktop) */}
+              {i < steps.length - 1 && (
+                <div className="hidden md:block absolute top-12 left-1/2 w-full h-[2px] bg-gradient-to-r from-slate-100 to-transparent -z-10" />
+              )}
               
-              <div className="w-14 h-14 rounded-2xl bg-[#0ea5e9]/10 flex items-center justify-center text-[#0ea5e9] mb-8">
-                <item.icon className="w-6 h-6" />
+              <div className="bg-slate-50 border border-slate-100 rounded-3xl p-8 h-full transition-all duration-500 group-hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] group-hover:-translate-y-2 group-hover:bg-white relative overflow-hidden">
+                {/* Background Number */}
+                <div className="absolute -right-4 -top-8 text-[120px] font-black text-slate-900/[0.03] select-none group-hover:text-[#0ea5e9]/5 transition-colors duration-500">
+                  {step.num}
+                </div>
+
+                <div className="w-14 h-14 rounded-2xl bg-white shadow-sm border border-slate-200 flex items-center justify-center mb-8 group-hover:scale-110 group-hover:shadow-md transition-all duration-500 relative z-10">
+                  <step.icon className={`w-6 h-6 ${step.color}`} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-3 relative z-10">{step.title}</h3>
+                <p className="text-slate-500 font-medium leading-relaxed relative z-10">{step.desc}</p>
               </div>
-              
-              <h3 className="font-semibold text-xl text-slate-900 mb-3">{item.title}</h3>
-              <p className="text-slate-500 leading-relaxed font-medium">{item.desc}</p>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          ))}
+        </div>
       </div>
     </section>
   )
