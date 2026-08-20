@@ -3,7 +3,9 @@ from datetime import date
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from app.api.paperwork_watch import (
+    router as paperwork_watch_router,
+)
 from app.api.auth import router as auth_router
 from app.api.intake import router as intake_router
 from app.api.payments import (
@@ -109,7 +111,7 @@ app.include_router(tasks_router)
 app.include_router(intake_router)
 app.include_router(payments_router)
 app.include_router(webhook_router)
-
+app.include_router(paperwork_watch_router)
 
 @app.get("/")
 def root():
