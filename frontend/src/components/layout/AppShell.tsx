@@ -29,6 +29,7 @@ import {
 
 
 const PUBLIC_ROUTES = [
+  "/",
   "/login",
   "/register",
 ]
