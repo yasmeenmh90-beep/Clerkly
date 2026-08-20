@@ -1,133 +1,86 @@
 "use client"
 
 import { motion } from 'framer-motion'
-import { LayoutDashboard, CheckSquare, FileText, Eye, Clock } from 'lucide-react'
-
-const spring: any = { type: "spring", stiffness: 260, damping: 20 }
+import { FileText, Upload, MoreHorizontal, Shield, Clock, Search } from 'lucide-react'
 
 export default function WorkspaceSection() {
   const docs = [
-    { name: "Q3 Marketing Retainer", type: "Contract", status: "Approved", statusColor: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-    { name: "W-4 Form - J. Smith", type: "Tax Form", status: "Needs Review", statusColor: "bg-amber-100 text-amber-700 border-amber-200" },
-    { name: "Business Registration", type: "Legal", status: "Processing", statusColor: "bg-sky-100 text-sky-700 border-sky-200" },
-    { name: "AWS Invoice Aug 2026", type: "Invoice", status: "Approved", statusColor: "bg-emerald-100 text-emerald-700 border-emerald-200" }
+    { name: 'Q3 Marketing Retainer', type: 'Contract', status: 'Approved', statusClass: 'bg-green-500/10 text-green-600 dark:text-green-400', conf: '99%', date: 'Today, 9:41 AM' },
+    { name: 'W-4 Form - J. Smith', type: 'Tax Form', status: 'Processing', statusClass: 'bg-primary/10 text-primary', conf: '-', date: 'Today, 9:15 AM' },
+    { name: 'Business Registration', type: 'Legal', status: 'Needs Review', statusClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400', conf: '82%', date: 'Today, 8:30 AM' },
+    { name: 'Vendor Agreement', type: 'Contract', status: 'Approved', statusClass: 'bg-green-500/10 text-green-600 dark:text-green-400', conf: '98%', date: 'Yesterday' },
+    { name: 'Insurance Certificate', type: 'Certificate', status: 'Approved', statusClass: 'bg-green-500/10 text-green-600 dark:text-green-400', conf: '95%', date: 'Yesterday' },
   ]
 
   return (
-    <section className="py-32 bg-slate-50 relative overflow-hidden">
+    <section className="py-28 relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-6">
-        
-        <motion.div 
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={spring}
-          className="text-center max-w-3xl mx-auto mb-20"
-        >
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-200 border border-slate-300 text-slate-700 text-xs font-bold tracking-widest uppercase mb-6">
-            <LayoutDashboard className="w-4 h-4" />
-            <span>Unified Workspace</span>
-          </div>
-          <h2 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 mb-6">
-            Your entire operation, <br className="hidden md:block" />
-            <span className="text-[#0ea5e9]">beautifully organized.</span>
-          </h2>
-        </motion.div>
-
-        {/* Dashboard Mockup */}
-        <motion.div
-          initial={{ opacity: 0, y: 100, rotateX: 20 }}
-          whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ type: "spring", stiffness: 100, damping: 30 }}
-          className="relative max-w-5xl mx-auto"
-          style={{ perspective: "2000px" }}
-        >
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
-            
-            {/* Window Chrome */}
-            <div className="bg-slate-100 border-b border-slate-200 px-6 py-4 flex items-center gap-4">
-              <div className="flex gap-2">
-                <div className="w-3 h-3 rounded-full bg-rose-400" />
-                <div className="w-3 h-3 rounded-full bg-amber-400" />
-                <div className="w-3 h-3 rounded-full bg-emerald-400" />
-              </div>
-              <div className="bg-white px-4 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-400 w-64 shadow-sm flex items-center gap-2">
-                <LayoutDashboard className="w-3 h-3" />
-                clerkly.app/dashboard
-              </div>
-            </div>
-
-            {/* Dashboard Content */}
-            <div className="flex">
-              {/* Sidebar */}
-              <div className="w-64 bg-slate-50 border-r border-slate-200 p-6 hidden md:block min-h-[400px]">
-                <div className="font-black text-slate-900 mb-8 flex items-center gap-2">
-                  <div className="w-6 h-6 rounded bg-[#0ea5e9] flex items-center justify-center">
-                    <FileText className="w-3 h-3 text-white" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+          {/* Left Text */}
+          <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, margin: '-80px' }}>
+            <h2 className="text-3xl md:text-4xl font-black tracking-tight text-foreground mb-6 leading-tight">
+              Your paperwork,<br /><span className="text-muted-foreground">all in one place</span>
+            </h2>
+            <p className="text-base text-muted-foreground leading-relaxed mb-8">
+              Organize, track, and manage all your important documents in a beautiful, intelligent workspace.
+            </p>
+            <ul className="space-y-3 mb-8">
+              {['Real-time processing status', 'Smart organization & search', 'Secure cloud storage', 'Team collaboration'].map((item, i) => (
+                <li key={i} className="flex items-center gap-2.5">
+                  <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+                    {[Clock, Search, Shield, FileText][i] && (() => { const Icon = [Clock, Search, Shield, FileText][i]; return <Icon className="w-3 h-3 text-primary" />; })()}
                   </div>
-                  Clerkly
-                </div>
-                <div className="space-y-1">
-                  {['Overview', 'Documents', 'Approvals', 'Settings'].map((item, i) => (
-                    <div key={item} className={`px-4 py-2 rounded-lg text-sm font-bold ${i === 1 ? 'bg-white shadow-sm border border-slate-200 text-[#0ea5e9]' : 'text-slate-500 hover:text-slate-900 cursor-pointer'}`}>
-                      {item}
-                    </div>
-                  ))}
-                </div>
-              </div>
+                  <span className="text-sm font-medium text-foreground">{item}</span>
+                </li>
+              ))}
+            </ul>
+            <a href="#" className="inline-flex items-center gap-1 text-sm font-bold text-foreground border border-border px-4 py-2 rounded-lg hover:bg-muted transition-colors">Explore dashboard →</a>
+          </motion.div>
 
-              {/* Main Area */}
-              <div className="flex-1 p-6 md:p-8 bg-white">
-                <div className="flex justify-between items-end mb-8">
-                  <div>
-                    <h3 className="text-2xl font-black text-slate-900">Recent Documents</h3>
-                    <p className="text-sm text-slate-500 font-medium mt-1">4 documents processed today.</p>
-                  </div>
-                  <button className="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md">
-                    Upload New
+          {/* Right Dashboard Mockup */}
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ delay: 0.2 }}>
+            <div className="glass-surface rounded-2xl overflow-hidden">
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded bg-primary flex items-center justify-center"><FileText className="w-3 h-3 text-white" /></div>
+                  <span className="font-bold text-sm text-foreground">Clerkly</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-foreground">Documents</span>
+                  <button className="bg-primary text-white text-[10px] font-bold px-3 py-1.5 rounded-md flex items-center gap-1">
+                    <Upload className="w-3 h-3" /> Upload
                   </button>
                 </div>
-
-                {/* Table */}
-                <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                  <div className="grid grid-cols-12 gap-4 px-6 py-4 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    <div className="col-span-6 md:col-span-5">Document</div>
-                    <div className="col-span-3 hidden md:block">Type</div>
-                    <div className="col-span-6 md:col-span-3">Status</div>
-                    <div className="col-span-1 hidden md:block">Action</div>
-                  </div>
-                  <div className="divide-y divide-slate-100">
+              </div>
+              {/* Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-border text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3">Document</th>
+                      <th className="px-6 py-3">Type</th>
+                      <th className="px-6 py-3">Status</th>
+                      <th className="px-6 py-3">Confidence</th>
+                      <th className="px-6 py-3">Uploaded</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
                     {docs.map((doc, i) => (
-                      <div key={i} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50 transition-colors cursor-pointer group">
-                        <div className="col-span-6 md:col-span-5 flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center">
-                            <FileText className="w-4 h-4 text-indigo-500" />
-                          </div>
-                          <span className="font-bold text-slate-700 text-sm">{doc.name}</span>
-                        </div>
-                        <div className="col-span-3 hidden md:block">
-                          <span className="text-sm font-medium text-slate-500">{doc.type}</span>
-                        </div>
-                        <div className="col-span-6 md:col-span-3">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${doc.statusColor}`}>
-                            {doc.status}
-                          </span>
-                        </div>
-                        <div className="col-span-1 hidden md:block">
-                          <Eye className="w-4 h-4 text-slate-300 group-hover:text-[#0ea5e9] transition-colors" />
-                        </div>
-                      </div>
+                      <tr key={i} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-6 py-3.5 text-sm font-semibold text-foreground">{doc.name}</td>
+                        <td className="px-6 py-3.5 text-xs text-muted-foreground">{doc.type}</td>
+                        <td className="px-6 py-3.5"><span className={`text-[10px] font-bold px-2 py-1 rounded-full ${doc.statusClass}`}>{doc.status}</span></td>
+                        <td className="px-6 py-3.5 text-xs font-bold text-foreground">{doc.conf}</td>
+                        <td className="px-6 py-3.5 text-xs text-muted-foreground">{doc.date}</td>
+                      </tr>
                     ))}
-                  </div>
-                </div>
+                  </tbody>
+                </table>
               </div>
             </div>
-          </div>
-          
-          {/* Decorative gradients around the mockup */}
-          <div className="absolute -inset-4 bg-gradient-to-r from-sky-500/10 to-indigo-500/10 blur-2xl -z-10 rounded-3xl" />
-        </motion.div>
+          </motion.div>
+        </div>
       </div>
     </section>
   )
