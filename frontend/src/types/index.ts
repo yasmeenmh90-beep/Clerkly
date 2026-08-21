@@ -52,6 +52,7 @@ export interface User {
   full_name: string | null
   is_active: boolean
   created_at: string
+  gmail_connected: boolean
 }
 
 export interface AccessToken {

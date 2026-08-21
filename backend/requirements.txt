@@ -35,3 +35,8 @@ uvicorn==0.52.3
 watchdog==6.0.0
 wrapt==2.3.0
 stripe==15.5.0
+google-auth
+google-auth-oauthlib
+google-api-python-client
+docusign-esign
+requests

@@ -8,6 +8,10 @@ from app.api.paperwork_watch import (
 )
 from app.api.auth import router as auth_router
 from app.api.intake import router as intake_router
+from app.api.email_intake import router as email_intake_router
+from app.api.signature_intake import (
+    router as signature_intake_router,
+)
 from app.api.payments import (
     router as payments_router,
     webhook_router,
@@ -109,6 +113,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(tasks_router)
 app.include_router(intake_router)
+app.include_router(email_intake_router)
+app.include_router(signature_intake_router)
 app.include_router(payments_router)
 app.include_router(webhook_router)
 app.include_router(paperwork_watch_router)

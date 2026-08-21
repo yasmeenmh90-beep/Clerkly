@@ -24,6 +24,14 @@ class UserResponse(BaseModel):
     is_active: bool
     created_at: datetime
 
+    # Whether Gmail is connected for email intake. Tokens
+    # themselves are never included in any API response.
+    gmail_connected: bool = False
+
+    # Whether DocuSign (sandbox) is connected for signature
+    # intake. Tokens themselves are never included here either.
+    docusign_connected: bool = False
+
 
 class AccessToken(BaseModel):
     access_token: str

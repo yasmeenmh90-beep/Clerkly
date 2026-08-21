@@ -103,6 +103,18 @@ class Settings:
     stripe_secret_key: str | None
     stripe_webhook_secret: str | None
 
+    google_client_id: str | None
+    google_client_secret: str | None
+    google_redirect_uri: str
+
+    docusign_integration_key: str | None
+    docusign_secret_key: str | None
+    docusign_account_id: str | None
+    docusign_redirect_uri: str
+    docusign_auth_base_path: str
+    docusign_api_base_path: str
+    docusign_connect_hmac_key: str | None
+
     frontend_url: str
     cors_origins: tuple[str, ...]
 
@@ -115,6 +127,21 @@ class Settings:
     @property
     def stripe_is_configured(self) -> bool:
         return self.stripe_secret_key is not None
+
+    @property
+    def google_oauth_is_configured(self) -> bool:
+        return (
+            self.google_client_id is not None
+            and self.google_client_secret is not None
+        )
+
+    @property
+    def docusign_is_configured(self) -> bool:
+        return (
+            self.docusign_integration_key is not None
+            and self.docusign_secret_key is not None
+            and self.docusign_account_id is not None
+        )
 
 
 def load_settings() -> Settings:
@@ -183,6 +210,56 @@ def load_settings() -> Settings:
         stripe_webhook_secret=(
             get_optional_environment_variable(
                 "STRIPE_WEBHOOK_SECRET"
+            )
+        ),
+        google_client_id=(
+            get_optional_environment_variable(
+                "GOOGLE_CLIENT_ID"
+            )
+        ),
+        google_client_secret=(
+            get_optional_environment_variable(
+                "GOOGLE_CLIENT_SECRET"
+            )
+        ),
+        google_redirect_uri=os.getenv(
+            "GOOGLE_REDIRECT_URI",
+            "http://localhost:8000/intake/email/callback",
+        ),
+        docusign_integration_key=(
+            get_optional_environment_variable(
+                "DOCUSIGN_INTEGRATION_KEY"
+            )
+        ),
+        docusign_secret_key=(
+            get_optional_environment_variable(
+                "DOCUSIGN_SECRET_KEY"
+            )
+        ),
+        docusign_account_id=(
+            get_optional_environment_variable(
+                "DOCUSIGN_ACCOUNT_ID"
+            )
+        ),
+        docusign_redirect_uri=os.getenv(
+            "DOCUSIGN_REDIRECT_URI",
+            "http://localhost:8000/intake/signature/callback",
+        ),
+        docusign_auth_base_path=os.getenv(
+            "DOCUSIGN_AUTH_BASE_PATH",
+            "account-d.docusign.com",
+        ),
+        docusign_api_base_path=os.getenv(
+            "DOCUSIGN_API_BASE_PATH",
+            "https://demo.docusign.net/restapi",
+        ),
+        # Set once you configure a Connect webhook in the
+        # DocuSign eSignature Admin console (Settings > Connect).
+        # Used to verify incoming webhook requests really came
+        # from DocuSign, same purpose as STRIPE_WEBHOOK_SECRET.
+        docusign_connect_hmac_key=(
+            get_optional_environment_variable(
+                "DOCUSIGN_CONNECT_HMAC_KEY"
             )
         ),
         frontend_url=os.getenv(

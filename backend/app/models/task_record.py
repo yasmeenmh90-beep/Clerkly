@@ -85,6 +85,16 @@ class TaskRecord(Base):
         default=False,
     )
 
+    plan_reasoning: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    plan_source: Mapped[Optional[str]] = mapped_column(
+        String(length=30),
+        nullable=True,
+    )
+
     # Stripe payment tracking
     payment_provider: Mapped[Optional[str]] = mapped_column(
         String(length=50),
@@ -106,6 +116,24 @@ class TaskRecord(Base):
     )
 
     payment_status: Mapped[Optional[str]] = mapped_column(
+        String(length=50),
+        nullable=True,
+    )
+
+    # DocuSign (sandbox) signature tracking
+    signature_provider: Mapped[Optional[str]] = mapped_column(
+        String(length=50),
+        nullable=True,
+    )
+
+    signature_envelope_id: Mapped[Optional[str]] = mapped_column(
+        String(length=255),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
+
+    signature_status: Mapped[Optional[str]] = mapped_column(
         String(length=50),
         nullable=True,
     )
