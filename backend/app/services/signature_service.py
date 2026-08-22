@@ -28,14 +28,6 @@ logger = logging.getLogger(__name__)
 
 DOCUSIGN_SIGNATURE_SCOPE = "signature"
 
-# Same short-lived signed-state pattern used for Gmail OAuth,
-# since this callback is also a plain browser redirect with no
-# Authorization header available. It also carries the PKCE
-# code_verifier, for the same reason it does for Gmail: the
-# authorization request and the token exchange are two separate
-# HTTP requests with no shared memory between them, and
-# DocuSign's app configuration has "Require Proof Key for Code
-# Exchange (PKCE)" enabled.
 OAUTH_STATE_PURPOSE = "docusign_oauth_state"
 OAUTH_STATE_EXPIRY_MINUTES = 10
 
@@ -64,8 +56,6 @@ def _require_docusign_configured() -> None:
 
 
 def _generate_code_verifier() -> str:
-    # PKCE spec requires 43-128 characters from an unreserved
-    # character set. token_urlsafe(64) produces ~86 characters.
     return secrets.token_urlsafe(64)
 
 
@@ -133,13 +123,6 @@ def _decode_state_token(state: str) -> tuple[str, str]:
 
 
 def build_authorization_url(user_id: str) -> str:
-    """
-    Build the DocuSign sandbox consent screen URL for the given
-    user, including a PKCE code_challenge. The returned URL has
-    a signed state parameter carrying the matching code_verifier,
-    so no separate server-side state storage is needed.
-    """
-
     _require_docusign_configured()
 
     code_verifier = _generate_code_verifier()
@@ -193,9 +176,6 @@ def _exchange_code_for_tokens(
     )
 
     if not response.ok:
-        # DocuSign puts the real reason in the response body
-        # (e.g. "invalid_grant", "invalid_request") — log it so
-        # future failures are debuggable instead of just "400".
         logger.error(
             "DocuSign token exchange failed (%s): %s",
             response.status_code,
@@ -212,12 +192,6 @@ def handle_oauth_callback(
     state: str,
     database: Session,
 ) -> UserRecord:
-    """
-    Exchange the authorization code for tokens, verify the
-    state token identifies a real user, and save the tokens to
-    that user's record.
-    """
-
     user_id, code_verifier = _decode_state_token(state)
 
     user = database.get(UserRecord, user_id)
@@ -337,10 +311,19 @@ def get_valid_access_token(
             "This user has not connected DocuSign yet"
         )
 
+    expiry = user.docusign_token_expiry
+
+    # SQLite does not reliably preserve timezone info on
+    # stored datetimes — a value saved as timezone-aware can
+    # come back naive on read. Normalize before comparing, or
+    # this raises "can't compare offset-naive and
+    # offset-aware datetimes".
+    if expiry is not None and expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=timezone.utc)
+
     is_expired = (
-        user.docusign_token_expiry is None
-        or user.docusign_token_expiry
-        <= datetime.now(timezone.utc)
+        expiry is None
+        or expiry <= datetime.now(timezone.utc)
     )
 
     if is_expired:
@@ -349,14 +332,10 @@ def get_valid_access_token(
     return user.docusign_access_token
 
 
-def _build_envelope_definition(task: TaskRecord) -> EnvelopeDefinition:
-    """
-    Build a simple one-page text document from the task's own
-    fields and send it to the task owner for signature. This is
-    a minimal envelope — no uploaded PDF, just enough content to
-    prove the real signing flow end-to-end.
-    """
-
+def _build_envelope_definition(
+    task: TaskRecord,
+    user: UserRecord,
+) -> EnvelopeDefinition:
     document_text = (
         f"CLERKLY SIGNATURE REQUEST\n\n"
         f"Task: {task.title}\n\n"
@@ -377,12 +356,20 @@ def _build_envelope_definition(task: TaskRecord) -> EnvelopeDefinition:
         document_id="1",
     )
 
+    # task.owner_id is the user's internal UUID, not an email
+    # address — DocuSign requires a real email here. Use the
+    # actual user record instead.
+    #
+    # Deliberately NOT setting client_user_id: that field marks
+    # a recipient as "embedded" in DocuSign's API, which
+    # suppresses the email entirely and expects the app to
+    # generate a signing URL directly instead. We want the
+    # normal remote/email signing flow, so this stays unset.
     signer = Signer(
-        email=task.owner_id,
-        name="Clerkly User",
+        email=user.email,
+        name=user.full_name or user.email,
         recipient_id="1",
         routing_order="1",
-        client_user_id=task.owner_id,
     )
 
     sign_here = SignHere(
@@ -409,13 +396,6 @@ def create_signature_envelope(
     user: UserRecord,
     database: Session,
 ) -> str:
-    """
-    Sends the given task out for signature via DocuSign
-    sandbox. Returns the envelope ID. Raises SignatureTaskError
-    if the task doesn't actually need a signature or is in the
-    wrong status.
-    """
-
     if not task.requires_signature:
         raise SignatureTaskError(
             "This task does not require a signature"
@@ -437,7 +417,7 @@ def create_signature_envelope(
 
     envelopes_api = EnvelopesApi(api_client)
 
-    envelope_definition = _build_envelope_definition(task)
+    envelope_definition = _build_envelope_definition(task, user)
 
     results = envelopes_api.create_envelope(
         settings.docusign_account_id,
@@ -469,13 +449,6 @@ def handle_envelope_completed(
     envelope_id: str,
     envelope_status: str,
 ) -> None:
-    """
-    Called by the DocuSign Connect webhook when an envelope's
-    status changes. Only marks a task complete when every
-    requirement (payment AND signature) is actually satisfied —
-    mirrors the same restraint as the Stripe webhook handler.
-    """
-
     task = database.query(TaskRecord).filter(
         TaskRecord.signature_envelope_id == envelope_id
     ).first()

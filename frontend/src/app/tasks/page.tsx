@@ -44,6 +44,7 @@ import {
   executeTask,
   getTasks,
   rejectRequest,
+  sendTaskForSignature,
 } from "@/lib/api"
 
 function formatDeadline(
@@ -242,47 +243,56 @@ export default function TasksPage() {
   }
 
 
-  async function handleExecute(
-  task: Task,
-): Promise<void> {
-  if (!task.requires_payment) {
-    await performTaskAction(() =>
+  async function handlePayment(
+    task: Task,
+  ): Promise<void> {
+    try {
+      setIsUpdating(true)
+      setActionError(null)
+
+      const checkout =
+        await createCheckoutSession(task.task_id)
+
+      if (!checkout.checkout_url) {
+        setActionError(
+          "Stripe did not return a Checkout URL.",
+        )
+
+        return
+      }
+
+      window.location.assign(
+        checkout.checkout_url,
+      )
+    } catch (requestError) {
+      if (requestError instanceof ApiError) {
+        setActionError(requestError.message)
+      } else {
+        setActionError(
+          "Unable to start payment. Please try again.",
+        )
+      }
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+
+  function handleSendForSignature(
+    task: Task,
+  ): void {
+    void performTaskAction(() =>
+      sendTaskForSignature(task.task_id),
+    )
+  }
+
+
+  function handleExecute(task: Task): void {
+    void performTaskAction(() =>
       executeTask(task.task_id),
     )
-
-    return
   }
 
-  try {
-    setIsUpdating(true)
-    setActionError(null)
-
-    const checkout =
-      await createCheckoutSession(task.task_id)
-
-    if (!checkout.checkout_url) {
-      setActionError(
-        "Stripe did not return a Checkout URL.",
-      )
-
-      return
-    }
-
-    window.location.assign(
-      checkout.checkout_url,
-    )
-  } catch (requestError) {
-    if (requestError instanceof ApiError) {
-      setActionError(requestError.message)
-    } else {
-      setActionError(
-        "Unable to start payment. Please try again.",
-      )
-    }
-  } finally {
-    setIsUpdating(false)
-  }
-}
 
   function openTask(task: Task): void {
     setActionError(null)
@@ -727,27 +737,83 @@ export default function TasksPage() {
 
 
                     {selectedTask.status === "approved" && (
-  <button
-    type="button"
-    disabled={isUpdating}
-    onClick={() =>
-      void handleExecute(selectedTask)
-    }
-    className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-  >
-    {isUpdating ? (
-      <Loader2 className="h-4 w-4 animate-spin" />
-    ) : (
-      <Play className="h-4 w-4" />
-    )}
+                      <>
+                        {/*
+                          A task can need payment, signature,
+                          both, or neither. Show one button per
+                          outstanding requirement instead of a
+                          single button that only ever checked
+                          requires_payment — that bug is why
+                          signature-only tasks used to fall
+                          through to plain Execute and get
+                          blocked by the backend's safety check.
+                        */}
 
-    {isUpdating
-      ? "Please wait..."
-      : selectedTask.requires_payment
-        ? "Continue to payment"
-        : "Execute"}
-  </button>
-)}
+                        {selectedTask.requires_payment && (
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() =>
+                              void handlePayment(selectedTask)
+                            }
+                            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                          >
+                            {isUpdating ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Banknote className="h-4 w-4" />
+                            )}
+
+                            {isUpdating
+                              ? "Please wait..."
+                              : "Continue to payment"}
+                          </button>
+                        )}
+
+                        {selectedTask.requires_signature && (
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() =>
+                              handleSendForSignature(selectedTask)
+                            }
+                            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                          >
+                            {isUpdating ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <PenTool className="h-4 w-4" />
+                            )}
+
+                            {isUpdating
+                              ? "Please wait..."
+                              : "Send for signature"}
+                          </button>
+                        )}
+
+                        {!selectedTask.requires_payment &&
+                          !selectedTask.requires_signature && (
+                            <button
+                              type="button"
+                              disabled={isUpdating}
+                              onClick={() =>
+                                handleExecute(selectedTask)
+                              }
+                              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                            >
+                              {isUpdating ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Play className="h-4 w-4" />
+                              )}
+
+                              {isUpdating
+                                ? "Please wait..."
+                                : "Execute"}
+                            </button>
+                          )}
+                      </>
+                    )}
 
 
                     {![

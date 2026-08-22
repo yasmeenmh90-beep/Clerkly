@@ -1,7 +1,7 @@
 import hashlib
 import hmac
 import logging
-
+import base64
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
@@ -211,6 +211,10 @@ def _verify_connect_signature(
     False (not True) when no HMAC key is configured yet, since
     that means Connect hasn't been set up — see the note in
     config.py.
+
+    DocuSign signs the payload as base64(HMAC-SHA256(key,
+    payload)) — not hex — so the comparison must use the same
+    encoding, or a correctly-configured key still fails to match.
     """
 
     if not settings.docusign_connect_hmac_key:
@@ -219,17 +223,20 @@ def _verify_connect_signature(
     if not signature_header:
         return False
 
-    computed_signature = hmac.new(
+    computed_digest = hmac.new(
         settings.docusign_connect_hmac_key.encode("utf-8"),
         payload,
         hashlib.sha256,
-    ).hexdigest()
+    ).digest()
+
+    computed_signature = base64.b64encode(
+        computed_digest
+    ).decode("utf-8")
 
     return hmac.compare_digest(
         computed_signature,
         signature_header,
     )
-
 
 @router.post(
     "/webhook",
@@ -255,6 +262,7 @@ async def docusign_connect_webhook(
         )
 
     payload = await request.body()
+    logger.info("DEBUG all headers received: %s", dict(request.headers))
 
     signature_header = request.headers.get(
         "X-DocuSign-Signature-1"
