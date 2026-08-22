@@ -3,10 +3,10 @@ from unittest.mock import patch
 from app.services.execution_service import TaskExecutionError
 
 
-
 def sample_task_payload(
     task_id: str = "test_task_001",
 ) -> dict:
+    """Create a payment task payload."""
     return {
         "task_id": task_id,
         "title": "Renew vehicle registration",
@@ -21,6 +21,27 @@ def sample_task_payload(
         "currency": "AED",
         "approval_required": True,
     }
+
+
+def internal_task_payload(
+    task_id: str = "internal_task_001",
+) -> dict:
+    """Create a task that needs no external provider."""
+    payload = sample_task_payload(task_id)
+
+    payload.update(
+        {
+            "title": "Review registration documents",
+            "description": "Review the supplied documents",
+            "required_action": "Review registration documents",
+            "requires_signature": False,
+            "requires_payment": False,
+            "payment_amount": None,
+            "currency": None,
+        }
+    )
+
+    return payload
 
 
 def test_create_and_get_task(authenticated_client):
@@ -38,7 +59,10 @@ def test_create_and_get_task(authenticated_client):
     )
 
     assert response.status_code == 200
-    assert response.json()["title"] == "Renew vehicle registration"
+    assert (
+        response.json()["title"]
+        == "Renew vehicle registration"
+    )
 
 
 def test_duplicate_task_id_returns_409(authenticated_client):
@@ -62,10 +86,41 @@ def test_duplicate_task_id_returns_409(authenticated_client):
 
 
 def test_approval_and_execution_flow(authenticated_client):
-    authenticated_client.post(
+    create_response = authenticated_client.post(
+        "/tasks/",
+        json=internal_task_payload(),
+    )
+
+    assert create_response.status_code == 201
+
+    approval_response = authenticated_client.post(
+        "/tasks/internal_task_001/approve"
+    )
+
+    assert approval_response.status_code == 200
+    assert approval_response.json()["status"] == "approved"
+    assert (
+        approval_response.json()["approval_required"]
+        is False
+    )
+
+    execution_response = authenticated_client.post(
+        "/tasks/internal_task_001/execute"
+    )
+
+    assert execution_response.status_code == 200
+    assert execution_response.json()["status"] == "completed"
+
+
+def test_payment_execution_is_blocked_without_provider(
+    authenticated_client,
+):
+    create_response = authenticated_client.post(
         "/tasks/",
         json=sample_task_payload(),
     )
+
+    assert create_response.status_code == 201
 
     approval_response = authenticated_client.post(
         "/tasks/test_task_001/approve"
@@ -73,14 +128,39 @@ def test_approval_and_execution_flow(authenticated_client):
 
     assert approval_response.status_code == 200
     assert approval_response.json()["status"] == "approved"
-    assert approval_response.json()["approval_required"] is False
 
     execution_response = authenticated_client.post(
         "/tasks/test_task_001/execute"
     )
 
-    assert execution_response.status_code == 200
-    assert execution_response.json()["status"] == "completed"
+    assert execution_response.status_code == 503
+    assert execution_response.json() == {
+        "detail": "Payment provider is not configured"
+    }
+
+    task_response = authenticated_client.get(
+        "/tasks/test_task_001"
+    )
+
+    assert task_response.status_code == 200
+    assert task_response.json()["status"] == "approved"
+
+    history_response = authenticated_client.get(
+        "/tasks/test_task_001/history"
+    )
+
+    assert history_response.status_code == 200
+
+    events = history_response.json()
+    blocked_event = events[-1]
+
+    assert blocked_event["event_type"] == "execution_blocked"
+    assert blocked_event["previous_status"] == "approved"
+    assert blocked_event["new_status"] == "approved"
+    assert (
+        blocked_event["message"]
+        == "Payment provider is not configured"
+    )
 
 
 def test_rejection_flow(authenticated_client):
@@ -98,7 +178,9 @@ def test_rejection_flow(authenticated_client):
     assert response.json()["approval_required"] is False
 
 
-def test_execute_without_approval_returns_400(authenticated_client):
+def test_execute_without_approval_returns_400(
+    authenticated_client,
+):
     authenticated_client.post(
         "/tasks/",
         json=sample_task_payload(),
@@ -114,22 +196,31 @@ def test_execute_without_approval_returns_400(authenticated_client):
     }
 
 
-def test_reject_completed_task_returns_400(authenticated_client):
-    authenticated_client.post(
+def test_reject_completed_task_returns_400(
+    authenticated_client,
+):
+    create_response = authenticated_client.post(
         "/tasks/",
-        json=sample_task_payload(),
+        json=internal_task_payload(),
     )
 
-    authenticated_client.post(
-        "/tasks/test_task_001/approve"
+    assert create_response.status_code == 201
+
+    approval_response = authenticated_client.post(
+        "/tasks/internal_task_001/approve"
     )
 
-    authenticated_client.post(
-        "/tasks/test_task_001/execute"
+    assert approval_response.status_code == 200
+
+    execution_response = authenticated_client.post(
+        "/tasks/internal_task_001/execute"
     )
+
+    assert execution_response.status_code == 200
+    assert execution_response.json()["status"] == "completed"
 
     response = authenticated_client.post(
-        "/tasks/test_task_001/reject"
+        "/tasks/internal_task_001/reject"
     )
 
     assert response.status_code == 400
@@ -150,21 +241,27 @@ def test_missing_task_returns_404(authenticated_client):
 
 
 def test_audit_history(authenticated_client):
-    authenticated_client.post(
+    create_response = authenticated_client.post(
         "/tasks/",
-        json=sample_task_payload(),
+        json=internal_task_payload(),
     )
 
-    authenticated_client.post(
-        "/tasks/test_task_001/approve"
+    assert create_response.status_code == 201
+
+    approval_response = authenticated_client.post(
+        "/tasks/internal_task_001/approve"
     )
 
-    authenticated_client.post(
-        "/tasks/test_task_001/execute"
+    assert approval_response.status_code == 200
+
+    execution_response = authenticated_client.post(
+        "/tasks/internal_task_001/execute"
     )
+
+    assert execution_response.status_code == 200
 
     response = authenticated_client.get(
-        "/tasks/test_task_001/history"
+        "/tasks/internal_task_001/history"
     )
 
     assert response.status_code == 200
@@ -177,7 +274,10 @@ def test_audit_history(authenticated_client):
     assert events[0]["new_status"] == "awaiting_approval"
 
     assert events[1]["event_type"] == "task_approved"
-    assert events[1]["previous_status"] == "awaiting_approval"
+    assert (
+        events[1]["previous_status"]
+        == "awaiting_approval"
+    )
     assert events[1]["new_status"] == "approved"
 
     assert events[2]["event_type"] == "execution_started"
@@ -233,14 +333,19 @@ def test_task_filtering(authenticated_client):
     assert tasks[0]["deadline"] == "2026-10-15"
     assert tasks[0]["requires_payment"] is True
 
+
 def test_task_pagination(authenticated_client):
     for number in range(1, 4):
         response = authenticated_client.post(
             "/tasks/",
             json={
-                "task_id": f"pagination_task_{number:03}",
+                "task_id": (
+                    f"pagination_task_{number:03}"
+                ),
                 "title": f"Pagination task {number}",
-                "description": "Task used for pagination testing",
+                "description": (
+                    "Task used for pagination testing"
+                ),
                 "source": "manual",
                 "status": "pending",
                 "deadline": None,
@@ -283,10 +388,15 @@ def test_task_pagination(authenticated_client):
 
     assert second_page.status_code == 200
     assert len(second_page.json()) == 1
-    assert second_page.json()[0]["task_id"] == "pagination_task_003"
+    assert (
+        second_page.json()[0]["task_id"]
+        == "pagination_task_003"
+    )
 
 
-def test_execution_failure_records_failed_status(authenticated_client):
+def test_execution_failure_records_failed_status(
+    authenticated_client,
+):
     task_data = {
         "task_id": "execution_failure_001",
         "title": "Execution failure test",
@@ -306,11 +416,13 @@ def test_execution_failure_records_failed_status(authenticated_client):
         "/tasks/",
         json=task_data,
     )
+
     assert create_response.status_code == 201
 
     approve_response = authenticated_client.post(
         "/tasks/execution_failure_001/approve"
     )
+
     assert approve_response.status_code == 200
 
     with patch(

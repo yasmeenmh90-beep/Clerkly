@@ -1,44 +1,62 @@
+import type { TaskStatus } from "@/types"
+
 import { cn } from "@/lib/utils"
-import { TaskStatus, TaskPriority } from "@/types"
 
-export function TaskStatusBadge({ status }: { status: TaskStatus }) {
-  const styles = {
-    pending: "bg-warning/10 text-warning border-warning/20",
-    in_progress: "bg-primary/10 text-primary border-primary/20",
-    waiting_approval: "bg-accent/50 text-accent-foreground border-border",
-    completed: "bg-success/10 text-success border-success/20",
-  }
-  
-  const labels = {
-    pending: "Pending",
-    in_progress: "In Progress",
-    waiting_approval: "Waiting Approval",
-    completed: "Completed"
-  }
 
-  return (
-    <span className={cn("px-2.5 py-1 rounded-full text-xs font-medium border", styles[status])}>
-      {labels[status]}
-    </span>
-  )
+const statusStyles: Record<TaskStatus, string> = {
+  pending:
+    "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/10 dark:text-yellow-400",
+
+  in_progress:
+    "bg-blue-100 text-blue-800 dark:bg-blue-500/10 dark:text-blue-400",
+
+  awaiting_approval:
+    "bg-orange-100 text-orange-800 dark:bg-orange-500/10 dark:text-orange-400",
+
+  approved:
+    "bg-green-100 text-green-800 dark:bg-green-500/10 dark:text-green-400",
+
+  completed:
+    "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-400",
+
+  rejected:
+    "bg-red-100 text-red-800 dark:bg-red-500/10 dark:text-red-400",
+
+  failed:
+    "bg-red-100 text-red-800 dark:bg-red-500/10 dark:text-red-400",
 }
 
-export function PriorityBadge({ priority }: { priority: TaskPriority }) {
-  const styles = {
-    low: "text-muted-foreground",
-    medium: "text-warning",
-    high: "text-danger"
-  }
-  
+
+const statusLabels: Record<TaskStatus, string> = {
+  pending: "Pending",
+  in_progress: "In Progress",
+  awaiting_approval: "Awaiting Approval",
+  approved: "Approved",
+  completed: "Completed",
+  rejected: "Rejected",
+  failed: "Failed",
+}
+
+
+interface TaskStatusBadgeProps {
+  status: TaskStatus
+  className?: string
+}
+
+
+export function TaskStatusBadge({
+  status,
+  className,
+}: TaskStatusBadgeProps) {
   return (
-    <div className="flex items-center gap-1.5">
-      <div className={cn("w-1.5 h-1.5 rounded-full", 
-        priority === 'high' ? 'bg-danger' : 
-        priority === 'medium' ? 'bg-warning' : 'bg-muted-foreground'
-      )} />
-      <span className={cn("text-xs font-medium capitalize", styles[priority])}>
-        {priority}
-      </span>
-    </div>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium",
+        statusStyles[status],
+        className,
+      )}
+    >
+      {statusLabels[status]}
+    </span>
   )
 }

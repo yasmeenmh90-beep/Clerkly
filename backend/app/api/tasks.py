@@ -15,10 +15,11 @@ from app.models.task_record import TaskRecord
 from app.models.user_record import UserRecord
 from app.services.audit_service import record_task_event
 from app.services.execution_service import (
+    ExecutionProviderNotConfigured,
     TaskExecutionError,
     execute_task_action,
+    validate_task_execution,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -281,6 +282,43 @@ def execute_task(
             detail="Task must be approved before execution",
         )
 
+    # --------------------------------------------------
+    # Check whether the required provider is connected
+    # --------------------------------------------------
+
+    try:
+        validate_task_execution(task)
+
+    except ExecutionProviderNotConfigured as error:
+        logger.warning(
+            "Execution blocked for task %s: %s",
+            task.task_id,
+            error,
+        )
+
+        record_task_event(
+            database=database,
+            task_id=task.task_id,
+            event_type="execution_blocked",
+            previous_status=task.status,
+            new_status=task.status,
+            message=str(error),
+        )
+
+        database.commit()
+
+        raise HTTPException(
+            status_code=503,
+            detail=str(error),
+            headers={
+                "Retry-After": "300",
+            },
+        ) from error
+
+    # --------------------------------------------------
+    # Mark execution as started
+    # --------------------------------------------------
+
     previous_status = task.status
     task.status = "in_progress"
 
@@ -292,6 +330,10 @@ def execute_task(
         new_status=task.status,
         message="Task execution started",
     )
+
+    # --------------------------------------------------
+    # Execute the internal task
+    # --------------------------------------------------
 
     try:
         execute_task_action(task)
@@ -323,6 +365,10 @@ def execute_task(
             detail="Task execution failed",
         ) from error
 
+    # --------------------------------------------------
+    # Mark internal task as completed
+    # --------------------------------------------------
+
     previous_status = task.status
     task.status = "completed"
 
@@ -332,7 +378,7 @@ def execute_task(
         event_type="execution_completed",
         previous_status=previous_status,
         new_status=task.status,
-        message="Task execution completed",
+        message="Internal task execution completed",
     )
 
     database.commit()

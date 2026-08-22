@@ -1,144 +1,181 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { Bell, CheckCircle2, AlertCircle, Info, Clock, Trash2, Check, Loader2 } from "lucide-react"
-import { getNotifications } from "@/lib/api"
-import { Notification } from "@/types"
+import {
+  useEffect,
+  useState,
+} from "react"
+
+import {
+  AlertCircle,
+  Bell,
+  CheckCircle2,
+  Clock,
+  Info,
+  Loader2,
+} from "lucide-react"
+
+import {
+  getNotifications,
+} from "@/lib/api"
+
+import type {
+  Notification,
+} from "@/types"
+
+
+function NotificationIcon({
+  type,
+}: {
+  type: Notification["type"]
+}) {
+  switch (type) {
+    case "success":
+      return (
+        <CheckCircle2 className="h-5 w-5 text-success" />
+      )
+
+    case "warning":
+      return (
+        <AlertCircle className="h-5 w-5 text-warning" />
+      )
+
+    case "error":
+      return (
+        <AlertCircle className="h-5 w-5 text-danger" />
+      )
+
+    default:
+      return (
+        <Info className="h-5 w-5 text-primary" />
+      )
+  }
+}
+
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [filter, setFilter] = useState<"all" | "unread">("all")
-  
+  const [
+    notifications,
+    setNotifications,
+  ] = useState<Notification[]>([])
+
+  const [
+    isLoading,
+    setIsLoading,
+  ] = useState(true)
+
+  const [
+    error,
+    setError,
+  ] = useState<string | null>(null)
+
+
   useEffect(() => {
-    const fetchNotifs = async () => {
+    async function loadNotifications(): Promise<void> {
       try {
         setIsLoading(true)
+        setError(null)
+
         const data = await getNotifications()
+
         setNotifications(data)
-      } catch (err) {
-        console.error("Failed to load notifications", err)
+      } catch (requestError) {
+        console.error(
+          "Failed to load recent updates",
+          requestError,
+        )
+
+        setError(
+          "Unable to load recent updates. Please try again.",
+        )
       } finally {
         setIsLoading(false)
       }
     }
-    fetchNotifs()
+
+    void loadNotifications()
   }, [])
 
-  const markAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
-  }
-
-  const markAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.notification_id === id ? { ...n, is_read: true } : n))
-  }
-
-  const clearNotification = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation()
-    setNotifications(prev => prev.filter(n => n.notification_id !== id))
-  }
-
-  const getIcon = (type: string) => {
-    switch(type) {
-      case "success": return <CheckCircle2 className="w-5 h-5 text-success" />
-      case "warning": return <AlertCircle className="w-5 h-5 text-warning" />
-      case "error": return <AlertCircle className="w-5 h-5 text-danger" />
-      default: return <Info className="w-5 h-5 text-primary" />
-    }
-  }
-
-  const filteredNotifs = filter === "all" ? notifications : notifications.filter(n => !n.is_read)
 
   return (
-    <div className="max-w-4xl mx-auto pb-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground tracking-tight">Notification Center</h1>
-          <p className="text-muted-foreground mt-1">Stay updated on your tasks, approvals, and documents.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="bg-card border border-border rounded-lg p-1 flex">
-            <button 
-              onClick={() => setFilter("all")}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${filter === "all" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              All
-            </button>
-            <button 
-              onClick={() => setFilter("unread")}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${filter === "unread" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Unread
-            </button>
-          </div>
-          {notifications.some(n => !n.is_read) && (
-            <button 
-              onClick={markAllRead}
-              className="px-4 py-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-2"
-            >
-              <Check className="w-4 h-4" /> Mark all read
-            </button>
-          )}
-        </div>
+    <div className="mx-auto max-w-4xl pb-8">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          Recent Updates
+        </h1>
+
+        <p className="mt-1 text-muted-foreground">
+          Activity generated by your tasks, approvals and documents.
+        </p>
       </div>
 
-      <div className="bg-card border border-border/60 rounded-2xl shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground space-y-4">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            <p>Loading notifications...</p>
+          <div className="flex h-64 flex-col items-center justify-center space-y-4 text-muted-foreground">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+
+            <p>Loading recent updates...</p>
           </div>
-        ) : filteredNotifs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center p-6">
-            <div className="w-16 h-16 bg-muted/50 rounded-full flex items-center justify-center mb-4">
-              <Bell className="w-8 h-8 text-muted-foreground opacity-40" />
+        ) : error ? (
+          <div className="flex h-64 flex-col items-center justify-center gap-3 p-6 text-center">
+            <AlertCircle className="h-8 w-8 text-danger" />
+
+            <p className="text-sm font-medium text-danger">
+              {error}
+            </p>
+          </div>
+        ) : notifications.length === 0 ? (
+          <div className="flex h-64 flex-col items-center justify-center p-6 text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
+              <Bell className="h-8 w-8 text-muted-foreground opacity-40" />
             </div>
-            <h3 className="text-lg font-medium text-foreground mb-1">No notifications</h3>
-            <p className="text-sm text-muted-foreground">You are all caught up on your alerts.</p>
+
+            <h3 className="mb-1 text-lg font-medium text-foreground">
+              No recent updates
+            </h3>
+
+            <p className="text-sm text-muted-foreground">
+              New task and document activity will appear here.
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-border/60">
-            <AnimatePresence initial={false}>
-              {filteredNotifs.map((notif) => (
-                <motion.div
-                  key={notif.notification_id}
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  onClick={() => markAsRead(notif.notification_id)}
-                  className={`group p-4 sm:p-6 hover:bg-muted/30 transition-all duration-200 cursor-pointer flex gap-4 ${!notif.is_read ? 'bg-primary/5' : ''}`}
-                >
-                  <div className="shrink-0 mt-1">
-                    {getIcon(notif.type)}
+            {notifications.map((notification) => (
+              <article
+                key={notification.notification_id}
+                className="flex gap-4 p-4 sm:p-6"
+              >
+                <div className="mt-1 shrink-0">
+                  <NotificationIcon
+                    type={notification.type}
+                  />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-start justify-between gap-4">
+                    <h2 className="text-base font-medium text-foreground">
+                      {notification.title}
+                    </h2>
+
+                    <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+
+                      {notification.timestamp}
+                    </span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start mb-1">
-                      <h4 className={`text-base font-medium truncate pr-4 ${!notif.is_read ? 'text-foreground' : 'text-foreground/80'}`}>
-                        {notif.title}
-                      </h4>
-                      <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
-                        <Clock className="w-3 h-3" /> {notif.timestamp}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {notif.description}
-                    </p>
-                  </div>
-                  <div className="shrink-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={(e) => clearNotification(e, notif.notification_id)}
-                      className="p-2 text-muted-foreground hover:text-danger hover:bg-danger/10 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {notification.description}
+                  </p>
+                </div>
+              </article>
+            ))}
           </div>
         )}
       </div>
+
+      <p className="mt-4 text-xs text-muted-foreground">
+        These updates are generated from Clerkly&apos;s task audit history.
+      </p>
     </div>
   )
 }

@@ -1,92 +1,217 @@
 "use client"
 
-import { motion } from "framer-motion"
-import { File, FileText, Loader2, SearchX } from "lucide-react"
-import { useState, useEffect } from "react"
-import { getDocuments } from "@/lib/api"
-import { Document } from "@/types"
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
 
-export function ProcessingDocuments({ searchQuery }: { searchQuery?: string }) {
-  const [documents, setDocuments] = useState<Document[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+import Link from "next/link"
+
+import {
+  motion,
+} from "framer-motion"
+
+import {
+  ArrowRight,
+  File,
+  FileText,
+  Loader2,
+  SearchX,
+} from "lucide-react"
+
+import type {
+  Task,
+} from "@/types"
+
+import {
+  getTasks,
+} from "@/lib/api"
+
+import {
+  TaskStatusBadge,
+} from "@/components/ui/badges"
+
+
+interface ProcessingDocumentsProps {
+  searchQuery?: string
+}
+
+
+export function ProcessingDocuments({
+  searchQuery = "",
+}: ProcessingDocumentsProps) {
+  const [tasks, setTasks] =
+    useState<Task[]>([])
+
+  const [isLoading, setIsLoading] =
+    useState(true)
+
 
   useEffect(() => {
-    const fetchDocs = async () => {
+    async function fetchDocumentTasks(): Promise<void> {
       try {
         setIsLoading(true)
-        const data = await getDocuments()
-        let filtered = data.filter(d => d.status === "processing")
-        if (searchQuery) {
-          filtered = filtered.filter(d => 
-            d.filename.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-        }
-        setDocuments(filtered)
-      } catch (err) {
-        console.error("Failed to load documents", err)
+
+        const data = await getTasks({
+          source: "document",
+          page: 1,
+          page_size: 100,
+        })
+
+        setTasks(data)
+      } catch (error) {
+        console.error(
+          "Failed to load document tasks",
+          error,
+        )
       } finally {
         setIsLoading(false)
       }
     }
-    fetchDocs()
-  }, [searchQuery])
+
+
+    function handleTaskUpdate(): void {
+      void fetchDocumentTasks()
+    }
+
+
+    void fetchDocumentTasks()
+
+    window.addEventListener(
+      "task-updated",
+      handleTaskUpdate,
+    )
+
+    return () => {
+      window.removeEventListener(
+        "task-updated",
+        handleTaskUpdate,
+      )
+    }
+  }, [])
+
+
+  const documentTasks = useMemo(() => {
+    const normalizedSearch =
+      searchQuery.trim().toLowerCase()
+
+    return tasks.filter((task) => {
+      return (
+        normalizedSearch.length === 0 ||
+        task.title
+          .toLowerCase()
+          .includes(normalizedSearch) ||
+        (task.description ?? "")
+          .toLowerCase()
+          .includes(normalizedSearch) ||
+        (task.required_action ?? "")
+          .toLowerCase()
+          .includes(normalizedSearch)
+      )
+    })
+  }, [
+    tasks,
+    searchQuery,
+  ])
+
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col h-full">
-      <div className="p-5 border-b border-border flex justify-between items-center bg-muted/10">
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="flex items-center justify-between border-b border-border bg-muted/10 p-5">
         <div>
-          <h2 className="text-lg font-semibold text-foreground tracking-tight">Processing Documents</h2>
-          <p className="text-xs text-muted-foreground mt-1">AI is currently analyzing these files</p>
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">
+            Document Tasks
+          </h2>
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            Tasks extracted from uploaded documents
+          </p>
         </div>
+
+        <Link
+          href="/documents"
+          className="flex items-center gap-1 text-sm font-medium text-primary transition-colors hover:text-primary/80"
+        >
+          Upload
+
+          <ArrowRight className="h-4 w-4" />
+        </Link>
       </div>
-      
-      <div className="divide-y divide-border flex-1 relative min-h-[200px]">
+
+
+      <div className="relative min-h-[200px] flex-1 divide-y divide-border">
         {isLoading ? (
           <div className="absolute inset-0 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
-        ) : documents.length === 0 ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4">
-            <div className="w-12 h-12 bg-muted/50 rounded-full flex items-center justify-center mb-3">
-              {searchQuery ? <SearchX className="w-5 h-5 text-muted-foreground opacity-50" /> : <File className="w-5 h-5 text-muted-foreground opacity-50" />}
+        ) : documentTasks.length === 0 ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted/50">
+              {searchQuery ? (
+                <SearchX className="h-5 w-5 text-muted-foreground opacity-50" />
+              ) : (
+                <File className="h-5 w-5 text-muted-foreground opacity-50" />
+              )}
             </div>
-            <p className="text-sm font-medium text-foreground">{searchQuery ? "No matching documents" : "No documents processing"}</p>
-            <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">{searchQuery ? "Try a different search term" : "Your processing queue is clear."}</p>
+
+            <p className="text-sm font-medium text-foreground">
+              {searchQuery
+                ? "No matching document tasks"
+                : "No document tasks yet"}
+            </p>
+
+            <p className="mt-1 max-w-[220px] text-xs text-muted-foreground">
+              {searchQuery
+                ? "Try a different search term."
+                : "Upload a document to create an analyzed task."}
+            </p>
           </div>
         ) : (
-          documents.slice(0, 4).map((doc, i) => (
-            <motion.div 
-              key={doc.document_id}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.2, delay: i * 0.05 }}
-              className="p-5 hover:bg-muted/50 transition-colors group relative"
-            >
-              <div className="flex items-start gap-4">
-                <div className="p-3 rounded-xl bg-accent/50 text-foreground border border-border relative overflow-hidden shrink-0">
-                  <div className="absolute inset-0 bg-primary/10 animate-pulse" />
-                  <FileText className="w-5 h-5 relative z-10" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-foreground text-sm truncate">{doc.filename}</h3>
-                  <div className="flex items-center justify-between mt-2">
-                    <p className="text-xs text-muted-foreground">{(doc.file_size / 1024 / 1024).toFixed(1)} MB • {doc.file_type.toUpperCase()}</p>
-                    <span className="text-xs font-medium text-primary flex items-center gap-1.5">
-                      <Loader2 className="w-3 h-3 animate-spin" /> Analyzing
-                    </span>
+          documentTasks
+            .slice(0, 4)
+            .map((task, index) => (
+              <motion.div
+                key={task.task_id}
+                initial={{
+                  opacity: 0,
+                  x: -10,
+                }}
+                animate={{
+                  opacity: 1,
+                  x: 0,
+                }}
+                transition={{
+                  duration: 0.2,
+                  delay: index * 0.05,
+                }}
+                className="p-5 transition-colors hover:bg-muted/40"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="shrink-0 rounded-xl border border-border bg-accent/50 p-3 text-foreground">
+                    <FileText className="h-5 w-5" />
                   </div>
-                  <div className="w-full h-1.5 bg-muted rounded-full mt-3 overflow-hidden">
-                    <motion.div 
-                      className="h-full bg-primary" 
-                      initial={{ width: "20%" }}
-                      animate={{ width: "80%" }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", repeatType: "reverse" }}
-                    />
+
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-sm font-medium text-foreground">
+                      {task.title}
+                    </h3>
+
+                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                      {task.description ??
+                        task.required_action ??
+                        "Task extracted from an uploaded document"}
+                    </p>
+
+                    <div className="mt-3">
+                      <TaskStatusBadge
+                        status={task.status}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          ))
+              </motion.div>
+            ))
         )}
       </div>
     </div>

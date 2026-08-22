@@ -1,182 +1,394 @@
 "use client"
 
-import { Search, Bell, Clock, Loader2 } from "lucide-react"
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react"
+
+import {
+  AnimatePresence,
+  motion,
+} from "framer-motion"
+
+import {
+  Bell,
+  Clock,
+  Loader2,
+  Search,
+} from "lucide-react"
+
+import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState, useRef, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { getNotifications } from "@/lib/api"
-import { Notification } from "@/types"
+
+import {
+  useAuth,
+} from "@/components/auth/AuthProvider"
+
+import {
+  getNotifications,
+} from "@/lib/api"
+
+import type {
+  Notification,
+} from "@/types"
+
+
+function getPageDetails(pathname: string): {
+  title: string
+  subtitle: string
+} {
+  if (pathname === "/dashboard" || pathname === "/") {
+    return {
+      title: "Dashboard",
+      subtitle: "Overview and activity",
+    }
+  }
+
+  if (pathname === "/tasks/new") {
+    return {
+      title: "Create Task",
+      subtitle: "Add a new manual task",
+    }
+  }
+
+  if (pathname === "/tasks") {
+    return {
+      title: "Tasks",
+      subtitle: "Manage your pending work",
+    }
+  }
+
+  if (pathname === "/approvals") {
+    return {
+      title: "Approvals",
+      subtitle: "Review and approve requests",
+    }
+  }
+
+  if (pathname === "/documents") {
+    return {
+      title: "Documents",
+      subtitle: "Upload documents for analysis",
+    }
+  }
+
+  if (pathname === "/activity") {
+    return {
+      title: "Activity",
+      subtitle: "Recent system events",
+    }
+  }
+
+  if (pathname === "/notifications") {
+    return {
+      title: "Notifications",
+      subtitle: "Recent Clerkly updates",
+    }
+  }
+
+  if (pathname === "/profile") {
+    return {
+      title: "Profile",
+      subtitle: "Your account information",
+    }
+  }
+
+  if (pathname === "/settings") {
+    return {
+      title: "Settings",
+      subtitle: "Account and appearance",
+    }
+  }
+
+  return {
+    title: "Clerkly",
+    subtitle: "Manage your paperwork",
+  }
+}
+
 
 export function Header() {
-  const pathname = usePathname();
-  const [showNotifications, setShowNotifications] = useState(false)
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const notifRef = useRef<HTMLDivElement>(null)
-  
-  const getPageTitle = () => {
-    if (pathname === '/dashboard' || pathname === '/') return { title: "Dashboard", subtitle: "Overview and activity" };
-    if (pathname === '/tasks') return { title: "Tasks", subtitle: "Manage your pending work" };
-    if (pathname === '/approvals') return { title: "Approvals", subtitle: "Review and approve requests" };
-    if (pathname === '/documents') return { title: "Documents", subtitle: "Your file repository" };
-    if (pathname === '/activity') return { title: "Activity", subtitle: "Recent system events" };
-    if (pathname === '/settings') return { title: "Settings", subtitle: "Manage your preferences" };
-    return { title: "Paperwork AI", subtitle: "Manage your paperwork" };
-  }
-  
-  const { title, subtitle } = getPageTitle();
+  const pathname = usePathname()
+  const {
+    user,
+  } = useAuth()
 
-  const unreadCount = notifications.filter(n => !n.is_read).length
+  const [
+    showNotifications,
+    setShowNotifications,
+  ] = useState(false)
+
+  const [
+    notifications,
+    setNotifications,
+  ] = useState<Notification[]>([])
+
+  const [
+    isLoading,
+    setIsLoading,
+  ] = useState(false)
+
+  const notificationRef =
+    useRef<HTMLDivElement>(null)
+
+  const {
+    title,
+    subtitle,
+  } = getPageDetails(pathname)
+
+  const displayName =
+    user?.full_name?.trim() ||
+    user?.email.split("@")[0] ||
+    "User"
+
+  const initials = displayName
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase()
+
 
   useEffect(() => {
-    const fetchNotifications = async () => {
+    async function fetchNotifications(): Promise<void> {
       try {
         setIsLoading(true)
+
         const data = await getNotifications()
+
         setNotifications(data)
-      } catch (err) {
-        console.error("Failed to load notifications", err)
+      } catch (error) {
+        console.error(
+          "Failed to load recent updates",
+          error,
+        )
       } finally {
         setIsLoading(false)
       }
     }
-    fetchNotifications()
+
+    void fetchNotifications()
   }, [])
 
+
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+    function handleClickOutside(
+      event: MouseEvent,
+    ): void {
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(
+          event.target as Node,
+        )
+      ) {
         setShowNotifications(false)
       }
     }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
+
+    document.addEventListener(
+      "mousedown",
+      handleClickOutside,
+    )
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleClickOutside,
+      )
+    }
   }, [])
 
-  const markAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+
+  function handleSearch(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ): void {
+    const parameters =
+      new URLSearchParams(window.location.search)
+
+    const query = event.target.value.trim()
+
+    if (query) {
+      parameters.set("q", query)
+    } else {
+      parameters.delete("q")
+    }
+
+    const queryString = parameters.toString()
+
+    window.history.replaceState(
+      {},
+      "",
+      queryString
+        ? `${pathname}?${queryString}`
+        : pathname,
+    )
+
+    window.dispatchEvent(
+      new Event("search-updated"),
+    )
   }
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.notification_id === id ? { ...n, is_read: true } : n))
-  }
 
   return (
-    <header className="h-16 px-4 md:px-6 lg:px-8 border-b border-border bg-card flex items-center justify-between shrink-0 pl-16 md:pl-8 relative z-40">
+    <header className="relative z-40 flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-4 pl-16 md:px-6 md:pl-8 lg:px-8">
       <div>
-        <h1 className="text-xl font-semibold text-foreground hidden sm:block">{title}</h1>
-        <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">{subtitle}</p>
+        <h1 className="hidden text-xl font-semibold text-foreground sm:block">
+          {title}
+        </h1>
+
+        <p className="hidden text-xs text-muted-foreground sm:block md:text-sm">
+          {subtitle}
+        </p>
       </div>
 
-      <div className="flex items-center gap-4 flex-1 justify-end">
-        <div className="relative w-full max-w-sm hidden md:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input 
-            type="text" 
-            placeholder="Search tasks, documents..." 
-            className="w-full h-9 pl-10 pr-4 rounded-full bg-background border border-border text-sm focus:outline-none focus:border-primary transition-all text-foreground"
-            onChange={(e) => {
-              const params = new URLSearchParams(window.location.search);
-              if (e.target.value) {
-                params.set('q', e.target.value);
-              } else {
-                params.delete('q');
-              }
-              window.history.replaceState({}, '', `${pathname}?${params.toString()}`);
-              window.dispatchEvent(new Event('search-updated'));
-            }}
+      <div className="flex flex-1 items-center justify-end gap-4">
+        <div className="relative hidden w-full max-w-sm md:block">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+          <input
+            type="search"
+            aria-label="Search Clerkly"
+            placeholder="Search tasks and activity..."
+            onChange={handleSearch}
+            className="h-9 w-full rounded-full border border-border bg-background pl-10 pr-4 text-sm text-foreground outline-none transition-colors focus:border-primary"
           />
         </div>
-        
-        <button className="md:hidden p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors">
-          <Search className="h-5 w-5" />
-        </button>
 
-        <div className="relative" ref={notifRef}>
-          <button 
-            onClick={() => setShowNotifications(!showNotifications)}
-            className={`relative p-2 rounded-full transition-colors ${showNotifications ? 'bg-muted text-foreground' : 'hover:bg-muted text-muted-foreground'}`}
+        <div
+          className="relative"
+          ref={notificationRef}
+        >
+          <button
+            type="button"
+            aria-label="Show recent updates"
+            aria-expanded={showNotifications}
+            onClick={() =>
+              setShowNotifications(
+                (currentValue) => !currentValue,
+              )
+            }
+            className={`rounded-full p-2 transition-colors ${
+              showNotifications
+                ? "bg-muted text-foreground"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
           >
             <Bell className="h-5 w-5" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-danger border-2 border-card"></span>
-            )}
           </button>
 
           <AnimatePresence>
             {showNotifications && (
               <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                transition={{ duration: 0.2 }}
-                className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-card border border-border rounded-xl shadow-xl overflow-hidden"
+                initial={{
+                  opacity: 0,
+                  y: 10,
+                  scale: 0.95,
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                  scale: 1,
+                }}
+                exit={{
+                  opacity: 0,
+                  y: 10,
+                  scale: 0.95,
+                }}
+                transition={{
+                  duration: 0.2,
+                }}
+                className="absolute right-0 top-full mt-2 w-80 overflow-hidden rounded-xl border border-border bg-card shadow-xl sm:w-96"
               >
-                <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30">
-                  <div>
-                    <h3 className="font-semibold text-foreground">Notifications</h3>
-                    <p className="text-xs text-muted-foreground">You have {unreadCount} unread messages</p>
-                  </div>
-                  {unreadCount > 0 && (
-                    <button 
-                      onClick={markAllRead}
-                      className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
-                    >
-                      Mark all as read
-                    </button>
-                  )}
+                <div className="border-b border-border bg-muted/30 p-4">
+                  <h3 className="font-semibold text-foreground">
+                    Recent Updates
+                  </h3>
+
+                  <p className="text-xs text-muted-foreground">
+                    Latest events from your Clerkly tasks
+                  </p>
                 </div>
 
-                <div className="max-h-96 overflow-y-auto relative min-h-24">
+                <div className="relative max-h-96 min-h-24 overflow-y-auto">
                   {isLoading ? (
-                    <div className="absolute inset-0 flex items-center justify-center bg-card/50">
-                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                    <div className="flex min-h-24 items-center justify-center">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
                     </div>
                   ) : notifications.length === 0 ? (
-                    <div className="p-10 text-center text-muted-foreground flex flex-col items-center">
-                      <div className="w-12 h-12 bg-muted/50 rounded-full flex items-center justify-center mb-3">
-                        <Bell className="w-6 h-6 opacity-40" />
+                    <div className="flex flex-col items-center p-10 text-center text-muted-foreground">
+                      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted/50">
+                        <Bell className="h-6 w-6 opacity-40" />
                       </div>
-                      <h4 className="text-sm font-medium text-foreground mb-1">No new notifications</h4>
-                      <p className="text-xs max-w-[200px]">You're all caught up. We'll notify you when something happens.</p>
+
+                      <h4 className="mb-1 text-sm font-medium text-foreground">
+                        No recent updates
+                      </h4>
+
+                      <p className="max-w-[200px] text-xs">
+                        Task and document events will appear here.
+                      </p>
                     </div>
                   ) : (
                     <div className="divide-y divide-border">
-                      {notifications.map(notif => (
-                        <div 
-                          key={notif.notification_id}
-                          onClick={() => markAsRead(notif.notification_id)}
-                          className={`p-4 hover:bg-muted/50 transition-colors cursor-pointer flex gap-3 ${!notif.is_read ? 'bg-primary/5' : ''}`}
-                        >
-                          <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${!notif.is_read ? 'bg-primary' : 'bg-transparent'}`} />
-                          <div className="flex-1 space-y-1">
-                            <div className="flex justify-between items-start">
-                              <p className={`text-sm font-medium ${!notif.is_read ? 'text-foreground' : 'text-foreground/80'}`}>{notif.title}</p>
-                              <span className="text-xs text-muted-foreground whitespace-nowrap ml-2 flex items-center gap-1">
-                                <Clock className="w-3 h-3" /> {notif.timestamp}
-                              </span>
+                      {notifications.map(
+                        (notification) => (
+                          <div
+                            key={
+                              notification.notification_id
+                            }
+                            className="flex gap-3 p-4"
+                          >
+                            <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
+
+                            <div className="flex-1 space-y-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm font-medium text-foreground">
+                                  {notification.title}
+                                </p>
+
+                                <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-muted-foreground">
+                                  <Clock className="h-3 w-3" />
+
+                                  {notification.timestamp}
+                                </span>
+                              </div>
+
+                              <p className="text-xs leading-relaxed text-muted-foreground">
+                                {notification.description}
+                              </p>
                             </div>
-                            <p className="text-xs text-muted-foreground leading-relaxed">{notif.description}</p>
                           </div>
-                        </div>
-                      ))}
+                        ),
+                      )}
                     </div>
                   )}
                 </div>
-                <div className="p-3 border-t border-border bg-muted/10 text-center">
-                  <button className="text-xs font-medium text-foreground hover:text-primary transition-colors">
-                    View all notifications
-                  </button>
+
+                <div className="border-t border-border bg-muted/10 p-3 text-center">
+                  <Link
+                    href="/notifications"
+                    onClick={() =>
+                      setShowNotifications(false)
+                    }
+                    className="text-xs font-medium text-foreground transition-colors hover:text-primary"
+                  >
+                    View all recent updates
+                  </Link>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        <div className="relative hidden sm:block ml-2">
-          <a href="/profile" className="w-9 h-9 rounded-full overflow-hidden border border-border/60 hover:border-primary/50 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center justify-center bg-primary/10 text-primary font-bold text-sm">
-             AJ
-          </a>
+        <div className="relative ml-2 hidden sm:block">
+          <Link
+            href="/profile"
+            aria-label={`Open ${displayName}'s profile`}
+            className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-primary/10 text-sm font-bold text-primary transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {initials}
+          </Link>
         </div>
       </div>
     </header>

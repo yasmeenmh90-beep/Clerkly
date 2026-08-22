@@ -45,3 +45,50 @@ class UserRecord(Base):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+    # --- Gmail OAuth (email intake) ---
+    gmail_connected: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
+    google_access_token: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    google_refresh_token: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    google_token_expiry: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    # --- DocuSign OAuth (signature intake) ---
+    # Sandbox/demo environment only — see config.py
+    # docusign_auth_base_path / docusign_api_base_path.
+
+    docusign_connected: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
+    docusign_access_token: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    docusign_refresh_token: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    docusign_token_expiry: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )

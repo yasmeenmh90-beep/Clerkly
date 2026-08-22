@@ -75,3 +75,84 @@ body {
 *, *::before, *::after {
   border-color: var(--border);
 }
+
+/* ============================================================
+   Landing page design system
+   Referenced by: Navbar.tsx, HeroSection.tsx, AIAnalysisSection.tsx,
+   SecuritySection.tsx, SocialProofSection.tsx, WorkspaceSection.tsx
+   These classes did not exist anywhere in the codebase before —
+   components were built assuming this stylesheet, but it was
+   never written. This file provides it.
+   ============================================================ */
+
+/* --- Navbar: transparent-to-solid glass effect on scroll --- */
+
+.glass-navbar {
+  background-color: color-mix(in srgb, var(--background) 55%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid transparent;
+}
+
+.glass-navbar-scrolled {
+  background-color: color-mix(in srgb, var(--background) 88%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* --- Floating cards (hero mockup: AI Extracted, Confidence, Review) --- */
+
+.glass-floating-card {
+  background-color: color-mix(in srgb, var(--card) 85%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* --- Flat glass panels (security pillars, testimonials, workspace) --- */
+
+.glass-surface {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* --- Hero background aurora blobs --- */
+
+.aurora-blob-1,
+.aurora-blob-2,
+.aurora-blob-3 {
+  filter: blur(80px);
+  opacity: 0.35;
+}
+
+.aurora-blob-1 {
+  background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
+}
+
+.aurora-blob-2 {
+  background: radial-gradient(circle, #a855f7 0%, transparent 70%);
+}
+
+.aurora-blob-3 {
+  background: radial-gradient(circle, #38bdf8 0%, transparent 70%);
+}
+
+.dark .aurora-blob-1,
+.dark .aurora-blob-2,
+.dark .aurora-blob-3 {
+  opacity: 0.18;
+}
+
+/* --- Hero document mockup paper texture --- */
+
+.paper-surface {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 8px 24px rgba(0, 0, 0, 0.08);
+}
