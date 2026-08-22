@@ -2,7 +2,7 @@
 
 Clerkly is an AI agent that reads, understands, and acts on everyday paperwork — documents, emails, payments, and signatures — so people spend less time on administrative busywork.
 
-Built for the **AWS "Agents for Humans" Hackathon** (Everyday Agents track), using the **Strands Agents SDK** and **Amazon Bedrock**.
+Built for the **AWS "Agents for Humans" Hackathon** (Everyday Agents track), using the **Strands Agents SDK**, **Amazon Bedrock**, and **OpenAI**.
 
 ---
 
@@ -25,7 +25,7 @@ Every step is logged in an audit trail, and anything involving money or a legal 
 
 ## Architecture
 
-Clerkly runs three real agents built with the **Strands Agents SDK**, backed by **Amazon Bedrock (Nova Lite)**:
+Clerkly runs three real agents built with the **Strands Agents SDK**:
 
 | Agent | Job |
 |---|---|
@@ -33,15 +33,20 @@ Clerkly runs three real agents built with the **Strands Agents SDK**, backed by 
 | **Paperwork Planner** | Decides whether a task can auto-complete or must be routed to human approval, and records its reasoning |
 | **Paperwork Watch Agent** | Runs a daily summary of pending tasks and upcoming deadlines |
 
-**Every agent has a deterministic fallback.** If Bedrock is unreachable, each agent still returns a safe, rule-based result instead of failing — the app keeps working even when the AI backend is down. (See "Known limitations" below — this fallback is active in the current submission because of an AWS-side account restriction, not a bug in the agents.)
+**Every agent runs a three-layer AI fallback:**
+1. **Amazon Bedrock (Nova Lite)** — the primary model
+2. **OpenAI (GPT-4o)** — tried automatically if Bedrock is unreachable
+3. **Deterministic rule-based extraction** — a last-resort safety net if neither AI provider responds
 
-**Safety by design, not by prompt:** a hardcoded check in the execution layer blocks any task requiring payment or signature from completing without explicit human approval first, regardless of what any agent decides. This can't be bypassed by a prompt or a model output.
+Each task records which layer actually handled it (`analysis_source` / `plan_source`: `"strands"`, `"openai_fallback"`, or `"deterministic_fallback"`), so it's always clear whether a result came from real AI or the fallback logic.
+
+**Safety by design, not by prompt:** a hardcoded check in the execution layer blocks any task requiring payment or signature from completing without explicit human approval first, regardless of what any agent — or which AI provider — decides. This can't be bypassed by a prompt or a model output.
 
 ---
 
 ## Tech stack
 
-**Backend:** FastAPI · SQLAlchemy · SQLite · Alembic · JWT auth (pwdlib/Argon2) · Strands Agents SDK · Amazon Bedrock
+**Backend:** FastAPI · SQLAlchemy · SQLite · Alembic · JWT auth (pwdlib/Argon2) · Strands Agents SDK · Amazon Bedrock · OpenAI
 
 **Integrations:** Stripe (payments) · DocuSign eSignature (sandbox, real signing flow) · Gmail API (OAuth, email intake)
 
@@ -75,16 +80,19 @@ cp .env.example .env
 ```
 You'll need:
 - `JWT_SECRET_KEY` — any long random string
+- `OPENAI_API_KEY` — for the second-layer AI fallback (platform.openai.com)
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` — for Gmail intake (Google Cloud Console)
 - `DOCUSIGN_INTEGRATION_KEY` / `DOCUSIGN_SECRET_KEY` / `DOCUSIGN_ACCOUNT_ID` / `DOCUSIGN_REDIRECT_URI` — for signature intake (DocuSign developer sandbox)
 - `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` — for payments (Stripe dashboard, test mode)
 - AWS credentials configured locally for Bedrock access (`aws configure` or SSO)
 
+`OPENAI_API_KEY` is optional — if it's not set, agents skip straight from Bedrock to the deterministic fallback.
+
 ### 5. Run database migrations
 ```bash
 alembic upgrade head
 ```
-This creates the SQLite database and applies every schema migration (users, tasks, OAuth token fields, payment tracking, signature tracking).
+This creates the SQLite database and applies every schema migration (users, tasks, OAuth token fields, payment tracking, signature tracking, AI source tracking).
 
 ### 6. Start the backend server
 ```bash
@@ -123,15 +131,15 @@ The app runs at `http://localhost:3000`.
 
 - Account registration and login (JWT)
 - Manual task creation, approval, rejection, and execution
-- Document upload → task creation (via deterministic fallback while Bedrock is blocked, see below)
+- Document upload → task creation, with real AI analysis via OpenAI fallback while Bedrock is blocked (see below)
 - Gmail connection and inbox sync into tasks
 - Stripe payments — real Checkout session, real webhook, task auto-completes on payment
 - DocuSign signatures — real OAuth connection, real envelope creation and email delivery, real signing, real webhook confirmation, task auto-completes on signature
-- Full audit trail of every task event
+- Full audit trail of every task event, including which AI layer handled each analysis
 
 ## Known limitations
 
-**Amazon Bedrock is currently blocked at the account level** (`ValidationException: Operation not allowed`) — this affects both the Bedrock Playground and API calls, and is not something fixable in code. An AWS Support case is open and escalated. Every agent's deterministic fallback is active as a result, so document/email analysis returns rule-based results instead of full AI extraction until access is restored. The rest of the system — task management, approvals, payments, and signatures — is unaffected and fully functional.
+**Amazon Bedrock is currently blocked at the account level** (`ValidationException: Operation not allowed`) — this affects both the Bedrock Playground and API calls, and is not something fixable in code. An AWS Support case is open and escalated. As a result, every agent currently falls through to its **OpenAI layer**, which handles document analysis and planning with real AI — Bedrock is the intended primary provider and works identically once AWS restores access. The deterministic rule-based layer only activates if both AI providers are unavailable. The rest of the system — task management, approvals, payments, and signatures — is unaffected and fully functional.
 
 ---
 
