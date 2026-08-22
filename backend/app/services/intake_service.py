@@ -11,7 +11,7 @@ def extract_task_from_document(
     content: str,
 ) -> Task:
 
-    analysis = analyze_document(content)
+    analysis = analyze_document(content, filename=filename)
 
     parsed_deadline = None
 
