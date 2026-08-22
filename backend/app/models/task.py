@@ -38,7 +38,18 @@ class Task(BaseModel):
     # Set by the Planner Agent (paperwork_planner_agent.py).
     plan_reasoning: Optional[str] = None
     plan_source: Optional[
-        Literal["strands", "deterministic_fallback"]
+        Literal[
+            "strands", "openai_fallback", "deterministic_fallback"
+        ]
+    ] = None
+
+    # Set by the Document Analyzer Agent (document_analyzer.py).
+    # Tracks whether Bedrock, OpenAI, or the deterministic
+    # fallback actually processed this document.
+    analysis_source: Optional[
+        Literal[
+            "strands", "openai_fallback", "deterministic_fallback"
+        ]
     ] = None
 
     # DocuSign (sandbox) signature tracking, mirrors the

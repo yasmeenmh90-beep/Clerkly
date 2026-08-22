@@ -24,17 +24,13 @@ class DocumentAnalysis(BaseModel):
     payment_amount: Optional[float] = None
     currency: Optional[str] = None
 
-
-bedrock_model = BedrockModel(
-    model_id=settings.bedrock_model_id,
-    region_name=settings.bedrock_region,
-    temperature=settings.bedrock_temperature,
-)
+    # "strands" = Bedrock processed it, "openai_fallback" =
+    # OpenAI processed it after Bedrock failed,
+    # "deterministic_fallback" = neither AI was reachable.
+    analysis_source: str = "strands"
 
 
-document_analyzer_agent = Agent(
-    model=bedrock_model,
-    system_prompt="""
+SYSTEM_PROMPT = """
 You are the Clerkly Document Analyzer Agent.
 
 Analyze the supplied paperwork and extract:
@@ -56,8 +52,46 @@ Rules:
 - Return null if no currency is stated.
 - Set requires_signature to true only when signing is required.
 - Set requires_payment to true only when payment is required.
-""",
+"""
+
+
+bedrock_model = BedrockModel(
+    model_id=settings.bedrock_model_id,
+    region_name=settings.bedrock_region,
+    temperature=settings.bedrock_temperature,
 )
+
+document_analyzer_agent = Agent(
+    model=bedrock_model,
+    system_prompt=SYSTEM_PROMPT,
+)
+
+
+def _get_openai_agent() -> Optional[Agent]:
+    """
+    Builds the OpenAI-backed agent lazily, only if a key is
+    configured — mirrors how the rest of the app treats
+    optional integrations (Stripe, DocuSign, Gmail).
+    """
+
+    if not settings.openai_is_configured:
+        return None
+
+    from strands.models.openai import OpenAIModel
+
+    openai_model = OpenAIModel(
+        client_args={"api_key": settings.openai_api_key},
+        model_id=settings.openai_model_id,
+        params={
+            "max_tokens": 1000,
+            "temperature": 0.2,
+        },
+    )
+
+    return Agent(
+        model=openai_model,
+        system_prompt=SYSTEM_PROMPT,
+    )
 
 
 def _fallback_analyze_document(
@@ -66,11 +100,10 @@ def _fallback_analyze_document(
 ) -> DocumentAnalysis:
     """
     Deterministic, rule-based document analysis used when
-    Bedrock is unreachable. It won't understand the document
-    the way the AI agent does, but it still lets the user get
-    a task out of their upload instead of a hard failure —
-    same reasoning as the fallback already used for email
-    intake and the Paperwork Planner Agent.
+    neither Bedrock nor OpenAI is reachable. It won't
+    understand the document the way a real model does, but it
+    still lets the user get a task out of their upload instead
+    of a hard failure.
     """
 
     title = (
@@ -158,6 +191,7 @@ def _fallback_analyze_document(
         requires_payment=requires_payment,
         payment_amount=payment_amount,
         currency=currency,
+        analysis_source="deterministic_fallback",
     )
 
 
@@ -165,21 +199,52 @@ def analyze_document(
     content: str,
     filename: str = "uploaded_document",
 ) -> DocumentAnalysis:
+    # Layer 1: Amazon Bedrock
     try:
         result = document_analyzer_agent(
             content,
             structured_output_model=DocumentAnalysis,
         )
 
-        return result.structured_output
+        analysis = result.structured_output
+        analysis.analysis_source = "strands"
 
-    except (BotoCoreError, ClientError) as error:
+        return analysis
+
+    except (BotoCoreError, ClientError) as bedrock_error:
         logger.warning(
-            "Bedrock unavailable, using deterministic "
-            "fallback for document analysis: %s",
-            error,
+            "Bedrock unavailable for document analysis: %s",
+            bedrock_error,
         )
 
+        # Layer 2: OpenAI, only if a key is configured
+        openai_agent = _get_openai_agent()
+
+        if openai_agent is not None:
+            try:
+                result = openai_agent(
+                    content,
+                    structured_output_model=DocumentAnalysis,
+                )
+
+                analysis = result.structured_output
+                analysis.analysis_source = "openai_fallback"
+
+                logger.info(
+                    "Bedrock was unavailable; OpenAI "
+                    "successfully analyzed the document instead."
+                )
+
+                return analysis
+
+            except Exception as openai_error:
+                logger.warning(
+                    "OpenAI fallback also unavailable for "
+                    "document analysis: %s",
+                    openai_error,
+                )
+
+        # Layer 3: deterministic rule-based fallback
         return _fallback_analyze_document(
             content=content,
             filename=filename,

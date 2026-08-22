@@ -100,6 +100,9 @@ class Settings:
     bedrock_region: str
     bedrock_temperature: float
 
+    openai_api_key: str | None
+    openai_model_id: str
+
     stripe_secret_key: str | None
     stripe_webhook_secret: str | None
 
@@ -142,6 +145,10 @@ class Settings:
             and self.docusign_secret_key is not None
             and self.docusign_account_id is not None
         )
+
+    @property
+    def openai_is_configured(self) -> bool:
+        return self.openai_api_key is not None
 
 
 def load_settings() -> Settings:
@@ -201,6 +208,18 @@ def load_settings() -> Settings:
         bedrock_temperature=get_float(
             "BEDROCK_TEMPERATURE",
             0.1,
+        ),
+        # Second-layer AI provider, used when Bedrock is
+        # unreachable. Tried before falling back to the
+        # deterministic rule-based analysis.
+        openai_api_key=(
+            get_optional_environment_variable(
+                "OPENAI_API_KEY"
+            )
+        ),
+        openai_model_id=os.getenv(
+            "OPENAI_MODEL_ID",
+            "gpt-4o",
         ),
         stripe_secret_key=(
             get_optional_environment_variable(

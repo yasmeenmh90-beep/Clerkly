@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel
 from strands import Agent
@@ -14,9 +14,30 @@ from app.models.paperwork_watch import (
 
 logger = logging.getLogger(__name__)
 
+WatchSource = Literal[
+    "strands",
+    "openai_fallback",
+    "deterministic_fallback",
+]
+
 
 class WatchAgentOutput(BaseModel):
     summary: str
+
+
+SYSTEM_PROMPT = (
+    "You are Clerkly's Paperwork Watch Agent. "
+    "You quietly monitor unfinished paperwork and "
+    "surface only items that genuinely need the "
+    "user's attention. "
+    "Prioritize overdue tasks, deadlines within two "
+    "days, failed execution, approval, payment, and "
+    "signature requirements. "
+    "Write one short daily summary in clear language. "
+    "Do not invent facts, dates, amounts, or actions. "
+    "Do not claim that an action was completed. "
+    "Keep the summary under 100 words."
+)
 
 
 bedrock_model = BedrockModel(
@@ -25,23 +46,36 @@ bedrock_model = BedrockModel(
     temperature=settings.bedrock_temperature,
 )
 
-
 paperwork_watch_agent = Agent(
     model=bedrock_model,
-    system_prompt=(
-        "You are Clerkly's Paperwork Watch Agent. "
-        "You quietly monitor unfinished paperwork and "
-        "surface only items that genuinely need the "
-        "user's attention. "
-        "Prioritize overdue tasks, deadlines within two "
-        "days, failed execution, approval, payment, and "
-        "signature requirements. "
-        "Write one short daily summary in clear language. "
-        "Do not invent facts, dates, amounts, or actions. "
-        "Do not claim that an action was completed. "
-        "Keep the summary under 100 words."
-    ),
+    system_prompt=SYSTEM_PROMPT,
 )
+
+
+def _get_openai_watch_agent() -> Optional[Agent]:
+    """
+    Builds the OpenAI-backed watch agent lazily, only if a key
+    is configured — same pattern as the other two agents.
+    """
+
+    if not settings.openai_is_configured:
+        return None
+
+    from strands.models.openai import OpenAIModel
+
+    openai_model = OpenAIModel(
+        client_args={"api_key": settings.openai_api_key},
+        model_id=settings.openai_model_id,
+        params={
+            "max_tokens": 300,
+            "temperature": 0.3,
+        },
+    )
+
+    return Agent(
+        model=openai_model,
+        system_prompt=SYSTEM_PROMPT,
+    )
 
 
 def create_fallback_summary(
@@ -118,15 +152,10 @@ def create_fallback_summary(
         f"{highest_priority.message}"
     )
 
+
 def generate_watch_summary(
     alerts: list[PaperworkAlert],
-) -> tuple[
-    str,
-    Literal[
-        "strands",
-        "deterministic_fallback",
-    ],
-]:
+) -> tuple[str, WatchSource]:
     if not alerts:
         return (
             create_fallback_summary(alerts),
@@ -145,6 +174,7 @@ def generate_watch_summary(
         f"{json.dumps(alert_data, indent=2)}"
     )
 
+    # Layer 1: Amazon Bedrock
     try:
         result = paperwork_watch_agent(
             prompt,
@@ -160,15 +190,46 @@ def generate_watch_summary(
 
         return output.summary.strip(), "strands"
 
-    except Exception as error:
-        # Bedrock access is currently restricted for some
-        # accounts. Deadline detection must continue working.
+    except Exception as bedrock_error:
         logger.warning(
-            "Paperwork Watch Agent unavailable; using "
-            "deterministic fallback: %s",
-            error,
+            "Paperwork Watch Agent (Bedrock) unavailable: %s",
+            bedrock_error,
         )
 
+        # Layer 2: OpenAI, only if a key is configured
+        openai_agent = _get_openai_watch_agent()
+
+        if openai_agent is not None:
+            try:
+                result = openai_agent(
+                    prompt,
+                    structured_output_model=WatchAgentOutput,
+                )
+
+                output = result.structured_output
+
+                if output is None or not output.summary.strip():
+                    raise ValueError(
+                        "The OpenAI Watch Agent returned an "
+                        "empty summary"
+                    )
+
+                logger.info(
+                    "Bedrock was unavailable; OpenAI "
+                    "successfully generated the watch summary "
+                    "instead."
+                )
+
+                return output.summary.strip(), "openai_fallback"
+
+            except Exception as openai_error:
+                logger.warning(
+                    "Paperwork Watch Agent (OpenAI fallback) "
+                    "also unavailable: %s",
+                    openai_error,
+                )
+
+        # Layer 3: deterministic rule-based fallback
         return (
             create_fallback_summary(alerts),
             "deterministic_fallback",

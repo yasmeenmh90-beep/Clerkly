@@ -95,6 +95,13 @@ class TaskRecord(Base):
         nullable=True,
     )
 
+    # Tracks whether Bedrock or the deterministic fallback
+    # produced this task's document analysis.
+    analysis_source: Mapped[Optional[str]] = mapped_column(
+        String(length=30),
+        nullable=True,
+    )
+
     # Stripe payment tracking
     payment_provider: Mapped[Optional[str]] = mapped_column(
         String(length=50),

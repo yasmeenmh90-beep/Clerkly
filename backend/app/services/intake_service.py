@@ -42,6 +42,8 @@ def extract_task_from_document(
 
         payment_amount=analysis.payment_amount,
         currency=analysis.currency,
+
+        analysis_source=analysis.analysis_source,
     )
 
     next_step, reasoning, plan_source = plan_next_step(task)

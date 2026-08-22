@@ -40,3 +40,4 @@ google-auth-oauthlib
 google-api-python-client
 docusign-esign
 requests
+openai==3.3.1
