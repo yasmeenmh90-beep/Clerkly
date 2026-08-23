@@ -46,7 +46,7 @@ Each task records which layer actually handled it (`analysis_source` / `plan_sou
 
 #### Backend architecture
 
-![Clerkly backend architecture](./clerkly-backend architecture.png)
+![Clerkly backend architecture](./clerkly-backend-architecture.png)
 
 This diagram breaks down the backend into its nine functional layers: API entry and routing, security and user ownership, the intake pipeline, the AI analysis layer, task workflow and execution, the service layer, the data and persistence layer, audit and observability, and configuration. It shows exactly which FastAPI routers exist, which services back them, how the three AI agents fit together with their fallback chain, how the SQLite schema is structured (Users, Tasks, and Task Events tables and their relationships), and what's actually verified in the test suite. This is the right diagram for understanding how the backend itself is organized internally.
 
