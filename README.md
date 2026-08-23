@@ -42,6 +42,26 @@ Each task records which layer actually handled it (`analysis_source` / `plan_sou
 
 **Safety by design, not by prompt:** a hardcoded check in the execution layer blocks any task requiring payment or signature from completing without explicit human approval first, regardless of what any agent — or which AI provider — decides. This can't be bypassed by a prompt or a model output.
 
+### Diagrams
+
+#### Backend architecture
+
+![Clerkly backend architecture](./clerkly-backend-architecture.png)
+
+This diagram breaks down the backend into its nine functional layers: API entry and routing, security and user ownership, the intake pipeline, the AI analysis layer, task workflow and execution, the service layer, the data and persistence layer, audit and observability, and configuration. It shows exactly which FastAPI routers exist, which services back them, how the three AI agents fit together with their fallback chain, how the SQLite schema is structured (Users, Tasks, and Task Events tables and their relationships), and what's actually verified in the test suite. This is the right diagram for understanding how the backend itself is organized internally.
+
+#### Full system architecture
+
+![Clerkly full system architecture](./clerkly-full-system-architecture.png)
+
+This diagram zooms out to show the whole system — not just the backend, but how the Next.js frontend, the FastAPI backend, and every external service actually talk to each other. It distinguishes three different kinds of connections: normal REST API calls from the frontend (JWT-authenticated), OAuth browser redirects for Gmail and DocuSign (where the user's browser is sent to Google or DocuSign directly, not through an API call), and webhooks (where Stripe and DocuSign call the backend directly, completely bypassing the frontend). The key insight this diagram makes visible: payment and signature confirmation never route through the frontend at all — the frontend only learns about a status change the next time it polls `/tasks`.
+
+#### Task workflow
+
+![Clerkly task workflow](./clerkly-workflow.png)
+
+This diagram traces the actual path a single piece of paperwork takes, from the moment it enters the system to the moment it's marked complete. It shows the three intake sources converging, the Document Analyzer extracting fields, the Paperwork Planner deciding whether a task can auto-complete or needs human approval, the hardcoded safety override that prevents any payment- or signature-requiring task from skipping approval, the human review step, and the three different execution paths depending on what a task actually needs (payment, signature, or neither). It also shows the Paperwork Watch Agent running in parallel on its own schedule, independent of this main flow, since it only reports on pending tasks rather than changing their status.
+
 ---
 
 ## Tech stack
