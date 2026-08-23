@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.agents.paperwork_watch_agent import (
@@ -12,6 +12,10 @@ from app.models.paperwork_watch import (
     PaperworkWatchSummary,
 )
 from app.models.user_record import UserRecord
+from app.services.notification_service import (
+    NotificationNotConfigured,
+    send_paperwork_watch_email,
+)
 from app.services.paperwork_watch_service import (
     scan_user_paperwork,
 )
@@ -26,15 +30,9 @@ router = APIRouter(
 )
 
 
-@router.post(
-    "/run",
-    response_model=PaperworkWatchSummary,
-)
-def run_paperwork_watch(
-    database: Session = Depends(get_db),
-    current_user: UserRecord = Depends(
-        get_current_user
-    ),
+def _run_watch_scan(
+    database: Session,
+    current_user: UserRecord,
 ) -> PaperworkWatchSummary:
     scan = scan_user_paperwork(
         database=database,
@@ -65,3 +63,60 @@ def run_paperwork_watch(
         summary=summary,
         alerts=scan.alerts,
     )
+
+
+@router.post(
+    "/run",
+    response_model=PaperworkWatchSummary,
+)
+def run_paperwork_watch(
+    database: Session = Depends(get_db),
+    current_user: UserRecord = Depends(
+        get_current_user
+    ),
+) -> PaperworkWatchSummary:
+    return _run_watch_scan(database, current_user)
+
+
+@router.post(
+    "/notify",
+    response_model=PaperworkWatchSummary,
+    responses={
+        503: {
+            "description": (
+                "Email notifications are not configured on "
+                "this server"
+            ),
+        },
+    },
+)
+def notify_paperwork_watch(
+    database: Session = Depends(get_db),
+    current_user: UserRecord = Depends(
+        get_current_user
+    ),
+) -> PaperworkWatchSummary:
+    """
+    Same as /run, but also emails the generated summary to the
+    current user — this is the proactive push the Watch Agent
+    didn't have before. It only fires on request right now
+    (a button in Settings/Dashboard), not on an automatic
+    schedule, since that would need real background job
+    infrastructure this app doesn't run yet.
+    """
+
+    result = _run_watch_scan(database, current_user)
+
+    try:
+        send_paperwork_watch_email(
+            to_email=current_user.email,
+            summary=result.summary,
+        )
+
+    except NotificationNotConfigured as error:
+        raise HTTPException(
+            status_code=503,
+            detail=str(error),
+        ) from error
+
+    return result

@@ -5,7 +5,11 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth_dependencies import get_current_user
+from app.auth_dependencies import (
+    CurrentOrganization,
+    get_current_organization,
+    get_current_user,
+)
 from app.config import settings
 from app.database import get_db
 from app.models.task import Task
@@ -41,13 +45,6 @@ router = APIRouter(
 def connect_gmail(
     current_user: UserRecord = Depends(get_current_user),
 ):
-    """
-    Returns the Google consent screen URL for the current user.
-    The frontend should redirect the browser to this URL —
-    this endpoint itself does not redirect, since it is called
-    via fetch/JSON from the Settings page, not a full page load.
-    """
-
     try:
         authorization_url = build_authorization_url(
             current_user.user_id
@@ -73,14 +70,6 @@ def gmail_oauth_callback(
     state: str = Query(...),
     database: Session = Depends(get_db),
 ):
-    """
-    Google redirects the user's browser here after they approve
-    (or deny) access. This endpoint is hit directly by the
-    browser, not by the frontend's JS — there is no Authorization
-    header available, which is why the signed state token is
-    what identifies the user instead.
-    """
-
     try:
         handle_oauth_callback(
             code=code,
@@ -125,13 +114,18 @@ def gmail_oauth_callback(
 def sync_email(
     database: Session = Depends(get_db),
     current_user: UserRecord = Depends(get_current_user),
+    current_organization: CurrentOrganization = Depends(
+        get_current_organization
+    ),
 ):
     """
     Fetches recent emails for the current user and runs each
     one through the same document intake pipeline as manual
     uploads (Document Analyzer -> Planner -> Task), then
     persists the resulting tasks the same way intake_document
-    does.
+    does — including stamping organization_id, so synced tasks
+    are visible to the whole organization, not just the person
+    who ran the sync.
     """
 
     try:
@@ -154,7 +148,18 @@ def sync_email(
     for task in created_tasks:
         task_record = TaskRecord(
             owner_id=current_user.user_id,
-            **task.model_dump(),
+            organization_id=(
+                current_organization.organization
+                .organization_id
+            ),
+            **task.model_dump(
+                exclude={
+                    "owner_name",
+                    "owner_email",
+                    "approved_by_name",
+                    "approved_by_email",
+                }
+            ),
         )
 
         try:
@@ -175,9 +180,6 @@ def sync_email(
             saved_tasks.append(task_record)
 
         except IntegrityError:
-            # Task ID collision on this one email — skip it and
-            # keep processing the rest of the sync rather than
-            # failing the whole request.
             database.rollback()
 
             logger.warning(

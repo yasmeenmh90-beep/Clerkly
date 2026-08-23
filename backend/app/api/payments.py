@@ -10,12 +10,14 @@ from fastapi import (
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth_dependencies import get_current_user
+from app.auth_dependencies import (
+    CurrentOrganization,
+    get_current_organization,
+)
 from app.config import settings
 from app.database import get_db
 from app.models.payment import CheckoutSessionResponse
 from app.models.task_record import TaskRecord
-from app.models.user_record import UserRecord
 from app.services.audit_service import record_task_event
 from app.services.payment_service import (
     InvalidPaymentTask,
@@ -40,14 +42,14 @@ webhook_router = APIRouter(
 )
 
 
-def find_owned_task_or_404(
+def find_org_task_or_404(
     task_id: str,
-    owner_id: str,
+    organization_id: str,
     database: Session,
 ) -> TaskRecord:
     statement = select(TaskRecord).where(
         TaskRecord.task_id == task_id,
-        TaskRecord.owner_id == owner_id,
+        TaskRecord.organization_id == organization_id,
     )
 
     task = database.scalar(statement)
@@ -68,11 +70,15 @@ def find_owned_task_or_404(
 def create_task_checkout_session(
     task_id: str,
     database: Session = Depends(get_db),
-    current_user: UserRecord = Depends(get_current_user),
+    current_organization: CurrentOrganization = Depends(
+        get_current_organization
+    ),
 ) -> CheckoutSessionResponse:
-    task = find_owned_task_or_404(
+    task = find_org_task_or_404(
         task_id=task_id,
-        owner_id=current_user.user_id,
+        organization_id=(
+            current_organization.organization.organization_id
+        ),
         database=database,
     )
 
@@ -165,7 +171,6 @@ def find_task_for_checkout_session(
     if task is not None:
         return task
 
-    # Metadata is used only as a fallback.
     if task_id:
         task = database.get(
             TaskRecord,
@@ -261,8 +266,6 @@ def handle_successful_checkout(
         None,
     )
 
-    # checkout.session.completed can sometimes arrive
-    # before delayed payment methods are actually paid.
     if payment_status != "paid":
         task.payment_status = (
             payment_status or "unpaid"
@@ -270,8 +273,6 @@ def handle_successful_checkout(
         database.commit()
         return
 
-    # Stripe may deliver the same webhook more than once.
-    # Avoid adding duplicate payment-completed events.
     if task.payment_status == "paid":
         logger.info(
             "Stripe payment already processed "
@@ -481,7 +482,6 @@ async def stripe_webhook(
             event_type,
         )
 
-        # Returning an error tells Stripe to retry.
         raise HTTPException(
             status_code=500,
             detail=(

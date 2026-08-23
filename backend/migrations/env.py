@@ -13,6 +13,9 @@ from app.models.user_record import UserRecord  # noqa: F401
 from app.models.task_event_record import TaskEventRecord  # noqa: F401
 from app.models.task_record import TaskRecord  # noqa: F401
 
+from app.models.organization_record import OrganizationRecord  # noqa: F401
+from app.models.organization_member_record import OrganizationMemberRecord  # noqa: F401
+from app.models.organization_invite_record import OrganizationInviteRecord  # noqa: F401
 
 config = context.config
 

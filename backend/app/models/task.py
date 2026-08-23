@@ -3,7 +3,6 @@ from typing import Optional, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 class Task(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -35,7 +34,6 @@ class Task(BaseModel):
 
     approval_required: bool = False
 
-    # Set by the Planner Agent (paperwork_planner_agent.py).
     plan_reasoning: Optional[str] = None
     plan_source: Optional[
         Literal[
@@ -43,19 +41,29 @@ class Task(BaseModel):
         ]
     ] = None
 
-    # Set by the Document Analyzer Agent (document_analyzer.py).
-    # Tracks whether Bedrock, OpenAI, or the deterministic
-    # fallback actually processed this document.
     analysis_source: Optional[
         Literal[
             "strands", "openai_fallback", "deterministic_fallback"
         ]
     ] = None
 
-    # DocuSign (sandbox) signature tracking, mirrors the
-    # existing Stripe payment tracking fields below.
+    original_filename: Optional[str] = None
+    original_file_path: Optional[str] = None
+
     signature_provider: Optional[str] = None
     signature_envelope_id: Optional[str] = None
     signature_status: Optional[
         Literal["sent", "signed", "declined", "voided"]
     ] = None
+
+    # --------------------------------------------------
+    # Attribution — read automatically off TaskRecord's
+    # owner/approver relationships. Always None for tasks
+    # created before this feature, or for auto-completed /
+    # rejected tasks that never went through approval.
+    # --------------------------------------------------
+
+    owner_name: Optional[str] = None
+    owner_email: Optional[str] = None
+    approved_by_name: Optional[str] = None
+    approved_by_email: Optional[str] = None

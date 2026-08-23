@@ -13,12 +13,26 @@ from app.services.auth_service import (
     hash_password,
     verify_password,
 )
+from app.services.organization_service import create_organization
 
 
 router = APIRouter(
     prefix="/auth",
     tags=["Authentication"],
 )
+
+
+def _default_organization_name(user: UserRecord) -> str:
+    """
+    Same naming convention as the Phase 1 migration's backfill
+    logic, so personal organizations look consistent whether a
+    user existed before or after that migration ran.
+    """
+
+    if user.full_name:
+        return f"{user.full_name}'s Workspace"
+
+    return f"{user.email}'s Workspace"
 
 
 @router.post(
@@ -64,6 +78,17 @@ def register_user(
             status_code=409,
             detail="Email is already registered",
         ) from error
+
+    # Every user needs to belong to at least one organization
+    # for get_current_organization to resolve anything — this
+    # gives every new signup the same "personal workspace"
+    # starting point that existing users got backfilled with
+    # in the Phase 1 migration.
+    create_organization(
+        database=database,
+        user=user,
+        name=_default_organization_name(user),
+    )
 
     return user
 

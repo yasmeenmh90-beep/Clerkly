@@ -1,8 +1,10 @@
 import base64
 import hashlib
+import hmac
 import logging
 import secrets
 from datetime import datetime, timezone
+from pathlib import Path
 
 import jwt
 import requests
@@ -30,6 +32,14 @@ DOCUSIGN_SIGNATURE_SCOPE = "signature"
 
 OAUTH_STATE_PURPOSE = "docusign_oauth_state"
 OAUTH_STATE_EXPIRY_MINUTES = 10
+
+# DocuSign document_id/file_extension mapping for the file
+# types we accept on upload. Used when sending the real
+# original file instead of the synthesized text summary.
+_FILE_EXTENSION_MAP = {
+    ".pdf": "pdf",
+    ".docx": "docx",
+}
 
 
 class DocuSignNotConfigured(Exception):
@@ -296,11 +306,6 @@ def get_valid_access_token(
     user: UserRecord,
     database: Session,
 ) -> str:
-    """
-    Return a valid DocuSign access token for this user,
-    refreshing it first if expired.
-    """
-
     _require_docusign_configured()
 
     if (
@@ -313,11 +318,6 @@ def get_valid_access_token(
 
     expiry = user.docusign_token_expiry
 
-    # SQLite does not reliably preserve timezone info on
-    # stored datetimes — a value saved as timezone-aware can
-    # come back naive on read. Normalize before comparing, or
-    # this raises "can't compare offset-naive and
-    # offset-aware datetimes".
     if expiry is not None and expiry.tzinfo is None:
         expiry = expiry.replace(tzinfo=timezone.utc)
 
@@ -332,10 +332,14 @@ def get_valid_access_token(
     return user.docusign_access_token
 
 
-def _build_envelope_definition(
-    task: TaskRecord,
-    user: UserRecord,
-) -> EnvelopeDefinition:
+def _build_text_summary_document(task: TaskRecord) -> Document:
+    """
+    The original fallback: a short auto-generated text summary
+    of the task, used when there's no original uploaded file to
+    send instead (email-sourced tasks, manual tasks, or if the
+    original file failed to save for some reason).
+    """
+
     document_text = (
         f"CLERKLY SIGNATURE REQUEST\n\n"
         f"Task: {task.title}\n\n"
@@ -349,11 +353,65 @@ def _build_envelope_definition(
         document_text.encode("utf-8")
     ).decode("utf-8")
 
-    document = Document(
+    return Document(
         document_base64=document_base64,
         name=f"Clerkly Task {task.task_id}",
         file_extension="txt",
         document_id="1",
+    )
+
+
+def _build_original_file_document(
+    task: TaskRecord,
+) -> Document | None:
+    """
+    Builds a DocuSign Document from the actual uploaded
+    PDF/DOCX, if one was saved for this task. Returns None if
+    there's nothing to load or the file is missing on disk —
+    the caller falls back to the text summary in that case.
+    """
+
+    if not task.original_file_path:
+        return None
+
+    file_path = Path(task.original_file_path)
+
+    if not file_path.exists():
+        logger.warning(
+            "original_file_path set for task %s but file is "
+            "missing on disk: %s",
+            task.task_id,
+            file_path,
+        )
+        return None
+
+    extension = file_path.suffix.lower()
+    docusign_extension = _FILE_EXTENSION_MAP.get(extension)
+
+    if docusign_extension is None:
+        return None
+
+    raw_bytes = file_path.read_bytes()
+
+    document_base64 = base64.b64encode(raw_bytes).decode(
+        "utf-8"
+    )
+
+    return Document(
+        document_base64=document_base64,
+        name=task.original_filename or file_path.name,
+        file_extension=docusign_extension,
+        document_id="1",
+    )
+
+
+def _build_envelope_definition(
+    task: TaskRecord,
+    user: UserRecord,
+) -> EnvelopeDefinition:
+    document = (
+        _build_original_file_document(task)
+        or _build_text_summary_document(task)
     )
 
     # task.owner_id is the user's internal UUID, not an email

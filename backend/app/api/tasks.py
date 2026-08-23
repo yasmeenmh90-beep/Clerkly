@@ -6,7 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth_dependencies import get_current_user
+from app.auth_dependencies import (
+    CurrentOrganization,
+    get_current_organization,
+    get_current_user,
+)
 from app.database import get_db
 from app.models.task import Task
 from app.models.task_event import TaskEvent
@@ -50,12 +54,21 @@ TaskSource = Literal[
 
 def find_task_or_404(
     task_id: str,
-    owner_id: str,
+    organization_id: str,
     database: Session,
 ) -> TaskRecord:
+    """
+    Scoped to the current organization, not just the current
+    user — a task is visible to any member of the organization
+    it belongs to, not only the person who created it. This is
+    the core change from single-user to multi-user: cross-org
+    access still returns 404, same convention as before, it's
+    just checking organization_id instead of owner_id now.
+    """
+
     statement = select(TaskRecord).where(
         TaskRecord.task_id == task_id,
-        TaskRecord.owner_id == owner_id,
+        TaskRecord.organization_id == organization_id,
     )
 
     task = database.scalar(statement)
@@ -70,7 +83,7 @@ def find_task_or_404(
 
 
 # --------------------------------------------------
-# Get all tasks belonging to current user
+# Get all tasks belonging to the current organization
 # --------------------------------------------------
 
 @router.get("/", response_model=list[Task])
@@ -83,10 +96,13 @@ def get_tasks(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     database: Session = Depends(get_db),
-    current_user: UserRecord = Depends(get_current_user),
+    current_organization: CurrentOrganization = Depends(
+        get_current_organization
+    ),
 ):
     query = database.query(TaskRecord).filter(
-        TaskRecord.owner_id == current_user.user_id
+        TaskRecord.organization_id
+        == current_organization.organization.organization_id
     )
 
     if status is not None:
@@ -130,17 +146,20 @@ def get_tasks(
 
 
 # --------------------------------------------------
-# Get current user's tasks waiting for approval
+# Get the current organization's tasks waiting for approval
 # Keep this before /{task_id}
 # --------------------------------------------------
 
 @router.get("/approvals", response_model=list[Task])
 def get_approvals(
     database: Session = Depends(get_db),
-    current_user: UserRecord = Depends(get_current_user),
+    current_organization: CurrentOrganization = Depends(
+        get_current_organization
+    ),
 ):
     statement = select(TaskRecord).where(
-        TaskRecord.owner_id == current_user.user_id,
+        TaskRecord.organization_id
+        == current_organization.organization.organization_id,
         TaskRecord.status == "awaiting_approval",
     )
 
@@ -148,7 +167,7 @@ def get_approvals(
 
 
 # --------------------------------------------------
-# Create task for current user
+# Create a task within the current organization
 # --------------------------------------------------
 
 @router.post("/", response_model=Task, status_code=201)
@@ -156,6 +175,9 @@ def create_task(
     task: Task,
     database: Session = Depends(get_db),
     current_user: UserRecord = Depends(get_current_user),
+    current_organization: CurrentOrganization = Depends(
+        get_current_organization
+    ),
 ):
     existing_task = database.get(
         TaskRecord,
@@ -170,7 +192,17 @@ def create_task(
 
     task_record = TaskRecord(
         owner_id=current_user.user_id,
-        **task.model_dump(),
+        organization_id=(
+            current_organization.organization.organization_id
+        ),
+        **task.model_dump(
+            exclude={
+                "owner_name",
+                "owner_email",
+                "approved_by_name",
+                "approved_by_email",
+            }
+        ),
     )
 
     database.add(task_record)
@@ -191,7 +223,7 @@ def create_task(
 
 
 # --------------------------------------------------
-# Get current user's task audit history
+# Get the current organization's task audit history
 # Keep this before /{task_id}
 # --------------------------------------------------
 
@@ -202,11 +234,15 @@ def create_task(
 def get_task_history(
     task_id: str,
     database: Session = Depends(get_db),
-    current_user: UserRecord = Depends(get_current_user),
+    current_organization: CurrentOrganization = Depends(
+        get_current_organization
+    ),
 ):
     find_task_or_404(
         task_id=task_id,
-        owner_id=current_user.user_id,
+        organization_id=(
+            current_organization.organization.organization_id
+        ),
         database=database,
     )
 
@@ -220,7 +256,12 @@ def get_task_history(
 
 
 # --------------------------------------------------
-# Approve current user's task
+# Approve a task in the current organization
+# Any member can approve — the org-level permission model
+# used here is intentionally simple: membership is the bar,
+# not a specific role. See organization_service.py for the
+# stricter owner/admin-only checks used for inviting and
+# removing members.
 # --------------------------------------------------
 
 @router.post("/{task_id}/approve", response_model=Task)
@@ -228,10 +269,15 @@ def approve_task(
     task_id: str,
     database: Session = Depends(get_db),
     current_user: UserRecord = Depends(get_current_user),
+    current_organization: CurrentOrganization = Depends(
+        get_current_organization
+    ),
 ):
     task = find_task_or_404(
         task_id=task_id,
-        owner_id=current_user.user_id,
+        organization_id=(
+            current_organization.organization.organization_id
+        ),
         database=database,
     )
 
@@ -244,6 +290,7 @@ def approve_task(
     previous_status = task.status
     task.status = "approved"
     task.approval_required = False
+    task.approved_by = current_user.user_id
 
     record_task_event(
         database=database,
@@ -261,18 +308,22 @@ def approve_task(
 
 
 # --------------------------------------------------
-# Execute current user's approved task
+# Execute an approved task in the current organization
 # --------------------------------------------------
 
 @router.post("/{task_id}/execute", response_model=Task)
 def execute_task(
     task_id: str,
     database: Session = Depends(get_db),
-    current_user: UserRecord = Depends(get_current_user),
+    current_organization: CurrentOrganization = Depends(
+        get_current_organization
+    ),
 ):
     task = find_task_or_404(
         task_id=task_id,
-        owner_id=current_user.user_id,
+        organization_id=(
+            current_organization.organization.organization_id
+        ),
         database=database,
     )
 
@@ -281,10 +332,6 @@ def execute_task(
             status_code=400,
             detail="Task must be approved before execution",
         )
-
-    # --------------------------------------------------
-    # Check whether the required provider is connected
-    # --------------------------------------------------
 
     try:
         validate_task_execution(task)
@@ -315,10 +362,6 @@ def execute_task(
             },
         ) from error
 
-    # --------------------------------------------------
-    # Mark execution as started
-    # --------------------------------------------------
-
     previous_status = task.status
     task.status = "in_progress"
 
@@ -330,10 +373,6 @@ def execute_task(
         new_status=task.status,
         message="Task execution started",
     )
-
-    # --------------------------------------------------
-    # Execute the internal task
-    # --------------------------------------------------
 
     try:
         execute_task_action(task)
@@ -365,10 +404,6 @@ def execute_task(
             detail="Task execution failed",
         ) from error
 
-    # --------------------------------------------------
-    # Mark internal task as completed
-    # --------------------------------------------------
-
     previous_status = task.status
     task.status = "completed"
 
@@ -388,18 +423,22 @@ def execute_task(
 
 
 # --------------------------------------------------
-# Reject current user's task
+# Reject a task in the current organization
 # --------------------------------------------------
 
 @router.post("/{task_id}/reject", response_model=Task)
 def reject_task(
     task_id: str,
     database: Session = Depends(get_db),
-    current_user: UserRecord = Depends(get_current_user),
+    current_organization: CurrentOrganization = Depends(
+        get_current_organization
+    ),
 ):
     task = find_task_or_404(
         task_id=task_id,
-        owner_id=current_user.user_id,
+        organization_id=(
+            current_organization.organization.organization_id
+        ),
         database=database,
     )
 
@@ -429,7 +468,7 @@ def reject_task(
 
 
 # --------------------------------------------------
-# Get one task belonging to current user
+# Get one task in the current organization
 # Keep dynamic route LAST
 # --------------------------------------------------
 
@@ -437,10 +476,14 @@ def reject_task(
 def get_task(
     task_id: str,
     database: Session = Depends(get_db),
-    current_user: UserRecord = Depends(get_current_user),
+    current_organization: CurrentOrganization = Depends(
+        get_current_organization
+    ),
 ):
     return find_task_or_404(
         task_id=task_id,
-        owner_id=current_user.user_id,
+        organization_id=(
+            current_organization.organization.organization_id
+        ),
         database=database,
     )

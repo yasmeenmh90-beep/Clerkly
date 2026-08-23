@@ -17,8 +17,12 @@ from app.api.payments import (
     webhook_router,
 )
 from app.api.tasks import router as tasks_router
+from app.api.organizations import (
+    router as organizations_router,
+)
 from app.config import settings
 from app.database import SessionLocal
+from app.models.organization_record import OrganizationRecord
 from app.models.task_record import TaskRecord
 
 logging.basicConfig(
@@ -49,9 +53,26 @@ def seed_initial_task() -> None:
         if existing_task is not None:
             return
 
+        # Assign the seeded task to the legacy user's
+        # organization if one exists (it will, for any database
+        # that has run the Phase 1 organizations migration).
+        # Falls back to None for a completely fresh database
+        # with no users yet — same as this task's prior
+        # behavior before organizations existed at all.
+        legacy_organization = database.query(
+            OrganizationRecord
+        ).filter(
+            OrganizationRecord.owner_id == "legacy-system-user"
+        ).first()
+
         initial_task = TaskRecord(
             task_id="task_001",
             owner_id="legacy-system-user",
+            organization_id=(
+                legacy_organization.organization_id
+                if legacy_organization
+                else None
+            ),
             title="Renew vehicle registration",
             description=(
                 "Vehicle registration renewal notice detected."
@@ -111,6 +132,7 @@ app.add_middleware(
 
 
 app.include_router(auth_router)
+app.include_router(organizations_router)
 app.include_router(tasks_router)
 app.include_router(intake_router)
 app.include_router(email_intake_router)

@@ -287,3 +287,4 @@ backend/clerkly_before_task_ownership.db
 # Keep safe configuration templates tracked
 !.env.example
 !backend/.env.example
+!frontend/src/lib/

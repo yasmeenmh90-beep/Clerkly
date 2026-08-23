@@ -43,6 +43,7 @@ class PaperworkWatchSummary(BaseModel):
 
     generated_by: Literal[
         "strands",
+        "openai_fallback",
         "deterministic_fallback",
     ]
 

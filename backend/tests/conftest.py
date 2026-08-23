@@ -6,6 +6,13 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
+from app.models.organization_invite_record import (
+    OrganizationInviteRecord,
+)
+from app.models.organization_member_record import (
+    OrganizationMemberRecord,
+)
+from app.models.organization_record import OrganizationRecord
 from app.models.task_event_record import TaskEventRecord
 from app.models.task_record import TaskRecord
 from app.models.user_record import UserRecord
@@ -47,9 +54,15 @@ def clear_database() -> None:
     database = TestingSessionLocal()
 
     try:
-        # Delete child records before their parent records.
+        # Delete child records before their parent records —
+        # organization_invites and organization_members both
+        # reference organizations, and organizations references
+        # users, so they all have to go before UserRecord.
         database.execute(delete(TaskEventRecord))
         database.execute(delete(TaskRecord))
+        database.execute(delete(OrganizationInviteRecord))
+        database.execute(delete(OrganizationMemberRecord))
+        database.execute(delete(OrganizationRecord))
         database.execute(delete(UserRecord))
         database.commit()
     finally:
@@ -104,3 +117,20 @@ def authenticated_client(client):
     )
 
     yield client
+
+
+@pytest.fixture
+def database():
+    """
+    Direct database session for tests that exercise a service
+    layer function directly rather than through an HTTP
+    endpoint — used for organization_service.py, which has no
+    router wired to it yet (that's Phase 3).
+    """
+
+    session = TestingSessionLocal()
+
+    try:
+        yield session
+    finally:
+        session.close()

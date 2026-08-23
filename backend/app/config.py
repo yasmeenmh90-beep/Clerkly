@@ -118,6 +118,17 @@ class Settings:
     docusign_api_base_path: str
     docusign_connect_hmac_key: str | None
 
+    # Outbound email for Paperwork Watch notifications. Uses
+    # plain SMTP rather than the Gmail API, since the existing
+    # Gmail OAuth connection is read-only (gmail.readonly) and
+    # reusing it for sending would need a broader scope and a
+    # fresh reconnect for every user.
+    smtp_host: str | None
+    smtp_port: int
+    smtp_username: str | None
+    smtp_password: str | None
+    smtp_from_email: str | None
+
     frontend_url: str
     cors_origins: tuple[str, ...]
 
@@ -149,6 +160,14 @@ class Settings:
     @property
     def openai_is_configured(self) -> bool:
         return self.openai_api_key is not None
+
+    @property
+    def smtp_is_configured(self) -> bool:
+        return (
+            self.smtp_host is not None
+            and self.smtp_username is not None
+            and self.smtp_password is not None
+        )
 
 
 def load_settings() -> Settings:
@@ -209,9 +228,6 @@ def load_settings() -> Settings:
             "BEDROCK_TEMPERATURE",
             0.1,
         ),
-        # Second-layer AI provider, used when Bedrock is
-        # unreachable. Tried before falling back to the
-        # deterministic rule-based analysis.
         openai_api_key=(
             get_optional_environment_variable(
                 "OPENAI_API_KEY"
@@ -272,13 +288,28 @@ def load_settings() -> Settings:
             "DOCUSIGN_API_BASE_PATH",
             "https://demo.docusign.net/restapi",
         ),
-        # Set once you configure a Connect webhook in the
-        # DocuSign eSignature Admin console (Settings > Connect).
-        # Used to verify incoming webhook requests really came
-        # from DocuSign, same purpose as STRIPE_WEBHOOK_SECRET.
         docusign_connect_hmac_key=(
             get_optional_environment_variable(
                 "DOCUSIGN_CONNECT_HMAC_KEY"
+            )
+        ),
+        smtp_host=(
+            get_optional_environment_variable("SMTP_HOST")
+        ),
+        smtp_port=get_positive_int("SMTP_PORT", 587),
+        smtp_username=(
+            get_optional_environment_variable(
+                "SMTP_USERNAME"
+            )
+        ),
+        smtp_password=(
+            get_optional_environment_variable(
+                "SMTP_PASSWORD"
+            )
+        ),
+        smtp_from_email=(
+            get_optional_environment_variable(
+                "SMTP_FROM_EMAIL"
             )
         ),
         frontend_url=os.getenv(

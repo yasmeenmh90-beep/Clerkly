@@ -6,7 +6,12 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth_dependencies import get_current_user
+from app.auth_dependencies import (
+    CurrentOrganization,
+    get_current_organization,
+    get_current_user,
+)
+from app.config import BASE_DIR, settings
 from app.database import get_db
 from app.models.task import Task
 from app.models.task_record import TaskRecord
@@ -14,13 +19,13 @@ from app.models.user_record import UserRecord
 from app.services.audit_service import record_task_event
 from app.services.document_text_service import extract_text_from_file
 from app.services.intake_service import extract_task_from_document
-from app.database import get_db
-from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 
 MAX_UPLOAD_SIZE = settings.max_upload_size_bytes
+
+UPLOAD_STORAGE_DIR = BASE_DIR / "uploaded_documents"
 
 
 ALLOWED_CONTENT_TYPES = {
@@ -45,6 +50,20 @@ router = APIRouter(
 )
 
 
+def _save_original_file(
+    task_id: str,
+    filename: str,
+    raw_content: bytes,
+) -> str:
+    task_folder = UPLOAD_STORAGE_DIR / task_id
+    task_folder.mkdir(parents=True, exist_ok=True)
+
+    file_path = task_folder / filename
+    file_path.write_bytes(raw_content)
+
+    return str(file_path)
+
+
 @router.post(
     "/document",
     response_model=Task,
@@ -59,18 +78,17 @@ async def intake_document(
     document: UploadFile = File(...),
     database: Session = Depends(get_db),
     current_user: UserRecord = Depends(get_current_user),
+    current_organization: CurrentOrganization = Depends(
+        get_current_organization
+    ),
 ):
-    # --------------------------------------------------
-    # Validate uploaded file
-    # --------------------------------------------------
-
     if not document.filename:
         raise HTTPException(
             status_code=400,
             detail=(
-    "Uploaded document exceeds the "
-    f"{settings.max_upload_size_mb} MB size limit"
-),
+                "Uploaded document exceeds the "
+                f"{settings.max_upload_size_mb} MB size limit"
+            ),
         )
 
     file_extension = Path(document.filename).suffix.lower()
@@ -92,7 +110,6 @@ async def intake_document(
             detail=f"Invalid content type for {file_extension} document",
         )
 
-    # Read only one byte beyond the limit.
     raw_content = await document.read(MAX_UPLOAD_SIZE + 1)
 
     if not raw_content:
@@ -107,18 +124,10 @@ async def intake_document(
             detail="Uploaded document exceeds the 5 MB size limit",
         )
 
-    # --------------------------------------------------
-    # Extract text from TXT, PDF, or DOCX
-    # --------------------------------------------------
-
     content = extract_text_from_file(
         filename=document.filename,
         raw_content=raw_content,
     )
-
-    # --------------------------------------------------
-    # Analyze document using the Strands agent
-    # --------------------------------------------------
 
     try:
         task = extract_task_from_document(
@@ -144,13 +153,34 @@ async def intake_document(
             },
         ) from error
 
-    # --------------------------------------------------
-    # Store task with the authenticated owner
-    # --------------------------------------------------
+    if file_extension in (".pdf", ".docx"):
+        try:
+            task.original_filename = document.filename
+            task.original_file_path = _save_original_file(
+                task_id=task.task_id,
+                filename=document.filename,
+                raw_content=raw_content,
+            )
+        except OSError as error:
+            logger.warning(
+                "Could not save original file for task %s: %s",
+                task.task_id,
+                error,
+            )
 
     task_record = TaskRecord(
         owner_id=current_user.user_id,
-        **task.model_dump(),
+        organization_id=(
+            current_organization.organization.organization_id
+        ),
+        **task.model_dump(
+            exclude={
+                "owner_name",
+                "owner_email",
+                "approved_by_name",
+                "approved_by_email",
+            }
+        ),
     )
 
     try:
