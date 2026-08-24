@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  FormEvent,
   useEffect,
   useState,
 } from "react"
@@ -17,6 +18,7 @@ import Link from "next/link"
 
 import {
   useRouter,
+  useSearchParams,
 } from "next/navigation"
 
 import {
@@ -29,8 +31,11 @@ import {
 } from "@/lib/api"
 
 
-export default function LoginPage() {
+import { Suspense } from "react"
+
+function LoginPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const {
     isAuthenticated,
@@ -50,23 +55,25 @@ export default function LoginPage() {
   const [error, setError] =
     useState<string | null>(null)
 
+  const returnUrl = searchParams.get("returnUrl") || "/dashboard"
 
   useEffect(() => {
     if (
       !isCheckingAuthentication &&
       isAuthenticated
     ) {
-      router.replace("/dashboard")
+      router.replace(returnUrl)
     }
   }, [
     isAuthenticated,
     isCheckingAuthentication,
     router,
+    returnUrl,
   ])
 
 
   async function handleSubmit(
-    event: React.FormEvent<HTMLFormElement>,
+    event: FormEvent<HTMLFormElement>,
   ): Promise<void> {
     event.preventDefault()
 
@@ -77,7 +84,7 @@ export default function LoginPage() {
       await login(email, password)
       await refreshUser()
 
-      router.replace("/dashboard")
+      router.replace(returnUrl)
     } catch (requestError) {
       if (requestError instanceof ApiError) {
         setError(requestError.message)
@@ -198,7 +205,7 @@ export default function LoginPage() {
             Do not have an account?{" "}
 
             <Link
-              href="/register"
+              href={`/register${returnUrl !== "/dashboard" ? `?returnUrl=${encodeURIComponent(returnUrl)}` : ""}`}
               className="font-medium text-primary hover:underline"
             >
               Create account
@@ -208,4 +215,4 @@ export default function LoginPage() {
       </div>
     </div>
   )
-}
+}export default function LoginPage() { return <Suspense><LoginPageContent /></Suspense> }

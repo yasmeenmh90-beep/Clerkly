@@ -3,6 +3,8 @@
 import {
   useEffect,
   useState,
+  FormEvent,
+  Suspense,
 } from "react"
 
 import {
@@ -18,6 +20,7 @@ import Link from "next/link"
 
 import {
   useRouter,
+  useSearchParams,
 } from "next/navigation"
 
 import {
@@ -31,8 +34,10 @@ import {
 } from "@/lib/api"
 
 
-export default function RegisterPage() {
+function RegisterPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const returnUrl = searchParams.get("returnUrl") || "/dashboard"
 
   const {
     isAuthenticated,
@@ -61,17 +66,18 @@ export default function RegisterPage() {
       !isCheckingAuthentication &&
       isAuthenticated
     ) {
-      router.replace("/dashboard")
+      router.replace(returnUrl)
     }
   }, [
     isAuthenticated,
     isCheckingAuthentication,
     router,
+    returnUrl,
   ])
 
 
   async function handleSubmit(
-    event: React.FormEvent<HTMLFormElement>,
+    event: FormEvent<HTMLFormElement>,
   ): Promise<void> {
     event.preventDefault()
 
@@ -88,7 +94,7 @@ export default function RegisterPage() {
       await login(email, password)
       await refreshUser()
 
-      router.replace("/dashboard")
+      router.replace(returnUrl)
     } catch (requestError) {
       if (requestError instanceof ApiError) {
         setError(requestError.message)
@@ -237,7 +243,7 @@ export default function RegisterPage() {
             Already have an account?{" "}
 
             <Link
-              href="/login"
+              href={`/login${returnUrl !== "/dashboard" ? `?returnUrl=${encodeURIComponent(returnUrl)}` : ""}`}
               className="font-medium text-primary hover:underline"
             >
               Sign in
@@ -247,4 +253,4 @@ export default function RegisterPage() {
       </div>
     </div>
   )
-}
+}export default function RegisterPage() { return <Suspense><RegisterPageContent /></Suspense> }

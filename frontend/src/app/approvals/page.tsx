@@ -329,6 +329,12 @@ export default function ApprovalsPage() {
                     </p>
                   )}
 
+                  {(task.owner_name || task.owner_email) && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Created by <span className="font-medium text-foreground/80">{task.owner_name || task.owner_email}</span>
+                    </p>
+                  )}
+
 
                   {task.requires_payment && (
                     <div className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border/50 bg-muted px-2.5 py-1 text-sm font-medium text-foreground">

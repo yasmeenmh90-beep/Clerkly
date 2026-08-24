@@ -257,6 +257,12 @@ export function PriorityTasks({
                           task.deadline,
                         )}
                       </p>
+
+                      {(task.owner_name || task.owner_email) && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Created by <span className="font-medium text-foreground/80">{task.owner_name || task.owner_email}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
 

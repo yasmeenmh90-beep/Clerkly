@@ -503,6 +503,12 @@ export default function TasksPage() {
                     )}
                 </p>
 
+                {(task.owner_name || task.owner_email) && (
+                  <p className="mb-4 text-xs text-muted-foreground">
+                    Created by <span className="font-medium text-foreground/80">{task.owner_name || task.owner_email}</span>
+                  </p>
+                )}
+
                 <div className="mt-auto flex items-center justify-between border-t border-border pt-4 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Clock className="h-3.5 w-3.5" />
@@ -615,6 +621,38 @@ export default function TasksPage() {
                     </p>
                   </div>
                 </div>
+
+                {(selectedTask.owner_name || selectedTask.owner_email) && (
+                  <div>
+                    <h4 className="mb-2 text-sm font-semibold text-foreground">
+                      Created by
+                    </h4>
+                    <p className="text-sm font-medium text-foreground">
+                      {selectedTask.owner_name || selectedTask.owner_email}
+                    </p>
+                    {selectedTask.owner_name && selectedTask.owner_email && (
+                      <p className="text-sm text-muted-foreground">
+                        {selectedTask.owner_email}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {(selectedTask.approved_by_name || selectedTask.approved_by_email) && (
+                  <div>
+                    <h4 className="mb-2 text-sm font-semibold text-foreground">
+                      Approved by
+                    </h4>
+                    <p className="text-sm font-medium text-foreground">
+                      {selectedTask.approved_by_name || selectedTask.approved_by_email}
+                    </p>
+                    {selectedTask.approved_by_name && selectedTask.approved_by_email && (
+                      <p className="text-sm text-muted-foreground">
+                        {selectedTask.approved_by_email}
+                      </p>
+                    )}
+                  </div>
+                )}
 
 
                 <div>

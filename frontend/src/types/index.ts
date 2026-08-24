@@ -27,6 +27,10 @@ export interface Task {
   payment_amount: number | null
   currency: string | null
   approval_required: boolean
+  owner_name?: string | null
+  owner_email?: string | null
+  approved_by_name?: string | null
+  approved_by_email?: string | null
 }
 
 export interface TaskEvent {

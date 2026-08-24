@@ -30,6 +30,7 @@ import {
 import {
   ThemeToggle,
 } from "@/components/ui/theme-toggle"
+import { MembersSection } from "@/components/settings/MembersSection"
 
 import {
   ApiError,
@@ -415,6 +416,8 @@ function SettingsContent() {
             </p>
           )}
         </section>
+
+        <MembersSection />
 
         <section className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
           <div className="mb-6">

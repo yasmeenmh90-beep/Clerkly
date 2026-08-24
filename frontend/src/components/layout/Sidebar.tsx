@@ -10,6 +10,7 @@ import { ThemeToggle } from "../ui/theme-toggle";
 import { LogOut } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth/AuthProvider"
+import { OrganizationSwitcher } from "@/components/organization/OrganizationSwitcher"
 const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Tasks", href: "/tasks", icon: CheckSquare },
@@ -89,6 +90,10 @@ function handleLogout(): void {
   Clerkly
 </span>
           </div>
+        </div>
+        
+        <div className="px-4 py-3 border-b border-border/50">
+          <OrganizationSwitcher />
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">

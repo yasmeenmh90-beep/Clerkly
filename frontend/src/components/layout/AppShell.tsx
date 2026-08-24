@@ -49,7 +49,7 @@ export function AppShell({
   } = useAuth()
 
   const isPublicRoute =
-    PUBLIC_ROUTES.includes(pathname)
+    PUBLIC_ROUTES.includes(pathname) || pathname.startsWith("/invite/")
 
 
   useEffect(() => {
