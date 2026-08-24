@@ -19,9 +19,9 @@ Clerkly takes paperwork in from three sources — a direct document upload, a co
 3. **Execute the action** — complete a payment via Stripe, send a document for e-signature via DocuSign, or simply mark the task done
 4. **Keep a daily watch** on anything still pending, so nothing slips through a deadline — and can email that summary directly on request
 
-Every step is logged in an audit trail, and anything involving money or a legal signature always requires human approval before it can complete — that rule is enforced in code, not just prompted to the AI.
+Every step is logged in an audit trail, and anything involving money or a legal signature always requires human approval before it can complete — that rule is enforced in code, not just prompted to the AI. Every task also shows who created it and who approved it, since a workspace can now have more than one person in it.
 
-Paperwork and tasks live inside a **workspace (organization)**, not tied to a single account — every new signup gets a personal workspace automatically, and other people can be invited into it by email, with an owner/admin/member role model.
+Paperwork and tasks live inside a **workspace (organization)**, not tied to a single account — every new signup gets a personal workspace automatically, and other people can be invited into it by email, with an owner/admin/member role model. Pending invites can be listed, cancelled, or resent, and a member's role can be changed after the fact.
 
 ---
 
@@ -44,7 +44,7 @@ Each task records which layer actually handled it (`analysis_source` / `plan_sou
 
 **Safety by design, not by prompt:** a hardcoded check in the execution layer blocks any task requiring payment or signature from completing without explicit human approval first, regardless of what any agent — or which AI provider — decides. This can't be bypassed by a prompt or a model output.
 
-**Multi-user by design:** every task, document, and approval belongs to an organization, not an individual account. Access is scoped by organization membership — a member can see and approve any task in their org, cross-org access returns 404 the same way cross-user access always has. Inviting, removing, and role-based permission checks (owner/admin/member) are all enforced server-side, not just hidden in the UI.
+**Multi-user by design:** every task, document, and approval belongs to an organization, not an individual account. Access is scoped by organization membership — a member can see and approve any task in their org, cross-org access returns 404 the same way cross-user access always has. Inviting, accepting, listing, cancelling, resending, removing, and role changes are all enforced server-side with owner/admin/member permission checks, not just hidden in the UI — and the frontend (organization switcher, Members & Invites page, accept-invite page) is fully wired to these real endpoints, not mocked data.
 
 ### Diagrams
 
@@ -117,7 +117,7 @@ You'll need:
 ```bash
 alembic upgrade head
 ```
-This creates the SQLite database and applies every schema migration (users, tasks, OAuth token fields, payment tracking, signature tracking, AI source tracking, and organizations/organization members/invites). Every existing user is automatically given a personal organization as part of this migration; every new signup gets one automatically going forward.
+This creates the SQLite database and applies every schema migration (users, tasks, OAuth token fields, payment tracking, signature tracking, AI source tracking, organizations/organization members/invites, and task attribution). Every existing user is automatically given a personal organization as part of this migration; every new signup gets one automatically going forward.
 
 ### 6. Start the backend server
 ```bash
@@ -150,7 +150,7 @@ npm run dev
 ```
 The app runs at `http://localhost:3000`.
 
-**Note:** the multi-user backend (organizations, invites, roles) is fully built and tested, but the corresponding frontend UI (organization switcher, members/invite page, accept-invite page) is in progress. Every existing page continues to work unchanged in the meantime, scoped to each user's personal workspace by default.
+The multi-user UI — organization switcher, Members & Invites page (invite, view, cancel, resend, change roles), and the accept-invite page — is fully built and tested against the real backend, not mock data. Task cards also show who created and who approved each task.
 
 ---
 
@@ -164,15 +164,15 @@ The app runs at `http://localhost:3000`.
 - Stripe payments — real Checkout session, real webhook, task auto-completes on payment
 - DocuSign signatures — real OAuth connection, real envelope creation and email delivery, real signing, real webhook confirmation, task auto-completes on signature
 - Paperwork Watch Agent — on-demand daily summary, with the option to email it directly via SMTP
-- Organizations — every user gets a personal workspace; inviting, accepting, listing, and removing members all tested via real HTTP requests, with owner/admin/member permission checks enforced server-side
+- Organizations — every user gets a personal workspace; inviting, accepting, listing, cancelling, resending, removing, and changing roles all tested via real HTTP requests, with owner/admin/member permission checks enforced server-side
+- Organization frontend UI — switcher, Members & Invites page, and accept-invite page, all wired to the real endpoints above and manually tested end to end, including a real invite sent and displayed correctly
+- Task attribution — "created by" and "approved by" shown on tasks, backed by real data, not placeholders
 - Full audit trail of every task event, including which AI layer handled each analysis
 - 50 automated backend tests passing
 
 ## Known limitations
 
 **Amazon Bedrock is currently blocked at the account level** (`ValidationException: Operation not allowed`) — this affects both the Bedrock Playground and API calls, and is not something fixable in code. An AWS Support case is open and escalated. As a result, every agent currently falls through to its **OpenAI layer**, which handles document analysis and planning with real AI — Bedrock is the intended primary provider and works identically once AWS restores access. The deterministic rule-based layer only activates if both AI providers are unavailable. The rest of the system — task management, approvals, payments, signatures, and organizations — is unaffected and fully functional.
-
-**Multi-user frontend UI is still in progress** — the backend fully supports organizations, invites, and roles (tested via the API), but the corresponding frontend pages are being built. Until then, every account behaves exactly as before, scoped to its own personal workspace.
 
 ---
 
