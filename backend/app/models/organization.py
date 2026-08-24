@@ -17,13 +17,6 @@ class Organization(BaseModel):
 
 
 class OrganizationWithRole(Organization):
-    """
-    What the frontend actually needs when listing "my
-    organizations" — the org itself plus the current user's
-    role in it, so the UI can show/hide member-management
-    actions without a second request.
-    """
-
     role: OrganizationRole
 
 
@@ -35,12 +28,11 @@ class OrganizationMember(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     membership_id: str
+    organization_id: str
     user_id: str
     role: OrganizationRole
     joined_at: datetime
 
-    # Filled in by the router, not stored on the membership
-    # record itself — joined from UserRecord for display.
     email: str
     full_name: str | None = None
 
@@ -60,3 +52,21 @@ class OrganizationInvite(BaseModel):
     created_at: datetime
     expires_at: datetime
     accepted_at: datetime | None = None
+
+
+class OrganizationInvitePreview(BaseModel):
+    """
+    Returned by the unauthenticated invite-preview endpoint —
+    just enough for the accept-invite page to show "you're
+    invited to join X as Y" before the person logs in.
+    """
+
+    organization_name: str
+    invited_email: str
+    role: OrganizationRole
+    is_expired: bool
+    is_accepted: bool
+
+
+class UpdateMemberRoleRequest(BaseModel):
+    role: OrganizationRole

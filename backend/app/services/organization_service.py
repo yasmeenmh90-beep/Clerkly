@@ -22,6 +22,7 @@ from app.services.notification_service import (
 logger = logging.getLogger(__name__)
 
 MANAGE_ROLES = {"owner", "admin"}
+VALID_ROLES = {"owner", "admin", "member"}
 
 
 class OrganizationNotFound(Exception):
@@ -39,7 +40,8 @@ class InsufficientPermission(Exception):
 
 
 class InviteNotFound(Exception):
-    """Raised when an invite token doesn't match any invite."""
+    """Raised when an invite token or ID doesn't match any
+    invite."""
 
 
 class InviteExpired(Exception):
@@ -47,7 +49,12 @@ class InviteExpired(Exception):
 
 
 class InviteAlreadyAccepted(Exception):
-    """Raised when trying to accept an invite twice."""
+    """Raised when trying to accept, cancel, or resend an
+    invite that's already been accepted."""
+
+
+class InvalidRole(Exception):
+    """Raised when a role isn't one of owner/admin/member."""
 
 
 def create_organization(
@@ -223,6 +230,208 @@ def accept_invite(
     invite.accepted_at = datetime.now(timezone.utc)
 
     database.add(membership)
+    database.commit()
+    database.refresh(membership)
+
+    return membership
+
+
+def get_invite_preview(
+    database: Session,
+    token: str,
+) -> tuple[OrganizationInviteRecord, OrganizationRecord]:
+    """
+    Looks up an invite by its token without requiring the
+    lookup to be authenticated as a member of that
+    organization — used by the accept-invite page to show
+    "you're invited to join X as Y" before the person logs in
+    or accepts.
+    """
+
+    invite = database.scalar(
+        select(OrganizationInviteRecord).where(
+            OrganizationInviteRecord.token == token
+        )
+    )
+
+    if invite is None:
+        raise InviteNotFound("This invite link is not valid")
+
+    organization = database.get(
+        OrganizationRecord, invite.organization_id
+    )
+
+    if organization is None:
+        raise OrganizationNotFound(
+            "The organization for this invite no longer exists"
+        )
+
+    return invite, organization
+
+
+def list_pending_invites(
+    database: Session,
+    organization_id: str,
+) -> list[OrganizationInviteRecord]:
+    """
+    Every invite for this org that hasn't been accepted yet —
+    includes expired ones, so the UI can show "expired" as a
+    status rather than the invite just silently disappearing.
+    """
+
+    statement = (
+        select(OrganizationInviteRecord)
+        .where(
+            OrganizationInviteRecord.organization_id
+            == organization_id,
+            OrganizationInviteRecord.accepted_at.is_(None),
+        )
+        .order_by(
+            OrganizationInviteRecord.created_at.desc()
+        )
+    )
+
+    return list(database.scalars(statement).all())
+
+
+def cancel_invite(
+    database: Session,
+    organization: OrganizationRecord,
+    invite_id: str,
+    cancelled_by: UserRecord,
+) -> None:
+    _require_manage_permission(
+        database,
+        organization.organization_id,
+        cancelled_by,
+    )
+
+    invite = database.get(
+        OrganizationInviteRecord, invite_id
+    )
+
+    if (
+        invite is None
+        or invite.organization_id
+        != organization.organization_id
+    ):
+        raise InviteNotFound(
+            "No pending invite found with this ID"
+        )
+
+    if invite.accepted_at is not None:
+        raise InviteAlreadyAccepted(
+            "This invite has already been accepted and can't "
+            "be cancelled"
+        )
+
+    database.delete(invite)
+    database.commit()
+
+
+def resend_invite(
+    database: Session,
+    organization: OrganizationRecord,
+    invite_id: str,
+    resent_by: UserRecord,
+) -> OrganizationInviteRecord:
+    """
+    Refreshes the invite's expiry to another 7 days out and
+    re-sends the email. Reuses the same token rather than
+    generating a new one, so a link the person already has
+    open in their inbox keeps working.
+    """
+
+    _require_manage_permission(
+        database,
+        organization.organization_id,
+        resent_by,
+    )
+
+    invite = database.get(
+        OrganizationInviteRecord, invite_id
+    )
+
+    if (
+        invite is None
+        or invite.organization_id
+        != organization.organization_id
+    ):
+        raise InviteNotFound(
+            "No pending invite found with this ID"
+        )
+
+    if invite.accepted_at is not None:
+        raise InviteAlreadyAccepted(
+            "This invite has already been accepted"
+        )
+
+    from app.models.organization_invite_record import (
+        INVITE_EXPIRY_DAYS,
+    )
+    from datetime import timedelta
+
+    invite.expires_at = datetime.now(timezone.utc) + timedelta(
+        days=INVITE_EXPIRY_DAYS
+    )
+
+    database.commit()
+    database.refresh(invite)
+
+    try:
+        send_organization_invite_email(
+            to_email=invite.invited_email,
+            organization_name=organization.name,
+            invited_by_name=(
+                resent_by.full_name or resent_by.email
+            ),
+            token=invite.token,
+        )
+    except NotificationNotConfigured as error:
+        logger.warning(
+            "Could not resend invite email for organization "
+            "%s: %s",
+            organization.organization_id,
+            error,
+        )
+
+    return invite
+
+
+def update_member_role(
+    database: Session,
+    organization: OrganizationRecord,
+    user_id: str,
+    new_role: str,
+    updated_by: UserRecord,
+) -> OrganizationMemberRecord:
+    _require_manage_permission(
+        database,
+        organization.organization_id,
+        updated_by,
+    )
+
+    if new_role not in VALID_ROLES:
+        raise InvalidRole(
+            f"'{new_role}' is not a valid role"
+        )
+
+    if user_id == organization.owner_id:
+        raise InsufficientPermission(
+            "The organization owner's role can't be changed"
+        )
+
+    membership = get_membership(
+        database, organization.organization_id, user_id
+    )
+
+    if membership is None:
+        raise NotOrganizationMember(
+            "This user is not a member of this organization"
+        )
+
+    membership.role = new_role
+
     database.commit()
     database.refresh(membership)
 

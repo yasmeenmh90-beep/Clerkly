@@ -15,8 +15,10 @@ from app.models.organization import (
     InviteMemberRequest,
     Organization,
     OrganizationInvite,
+    OrganizationInvitePreview,
     OrganizationMember,
     OrganizationWithRole,
+    UpdateMemberRoleRequest,
 )
 from app.models.organization_member_record import (
     OrganizationMemberRecord,
@@ -89,13 +91,6 @@ def list_current_organization_members(
         get_current_organization
     ),
 ):
-    """
-    Lists members of whichever organization the
-    X-Organization-ID header (or default) resolves to — same
-    pattern every task-related endpoint already uses, so the
-    frontend doesn't need a separate "which org" concept here.
-    """
-
     statement = (
         select(OrganizationMemberRecord, UserRecord)
         .join(
@@ -115,6 +110,7 @@ def list_current_organization_members(
     return [
         OrganizationMember(
             membership_id=membership.membership_id,
+            organization_id=membership.organization_id,
             user_id=membership.user_id,
             role=membership.role,
             joined_at=membership.joined_at,
@@ -125,20 +121,26 @@ def list_current_organization_members(
     ]
 
 
-@router.post(
-    "/members/invite",
-    response_model=OrganizationInvite,
-    status_code=201,
+@router.patch(
+    "/members/{user_id}",
+    response_model=OrganizationMember,
     responses={
         403: {
             "description": (
-                "Only an owner or admin can invite members"
+                "Only an owner or admin can change roles, and "
+                "the owner's role can't be changed"
+            ),
+        },
+        404: {
+            "description": (
+                "This user is not a member of this organization"
             ),
         },
     },
 )
-def invite_organization_member(
-    body: InviteMemberRequest,
+def update_organization_member_role(
+    user_id: str,
+    body: UpdateMemberRoleRequest,
     database: Session = Depends(get_db),
     current_user: UserRecord = Depends(get_current_user),
     current_organization: CurrentOrganization = Depends(
@@ -146,12 +148,12 @@ def invite_organization_member(
     ),
 ):
     try:
-        invite = organization_service.invite_member(
+        membership = organization_service.update_member_role(
             database=database,
             organization=current_organization.organization,
-            invited_email=str(body.email),
-            role=body.role,
-            invited_by=current_user,
+            user_id=user_id,
+            new_role=body.role,
+            updated_by=current_user,
         )
 
     except organization_service.InsufficientPermission as error:
@@ -160,57 +162,22 @@ def invite_organization_member(
             detail=str(error),
         ) from error
 
-    return invite
-
-
-@router.post(
-    "/invites/{token}/accept",
-    response_model=OrganizationMember,
-    responses={
-        404: {
-            "description": "This invite link is not valid",
-        },
-        410: {
-            "description": (
-                "This invite has already been used or expired"
-            ),
-        },
-    },
-)
-def accept_organization_invite(
-    token: str,
-    database: Session = Depends(get_db),
-    current_user: UserRecord = Depends(get_current_user),
-):
-    try:
-        membership = organization_service.accept_invite(
-            database=database,
-            token=token,
-            accepting_user=current_user,
-        )
-
-    except organization_service.InviteNotFound as error:
+    except organization_service.NotOrganizationMember as error:
         raise HTTPException(
             status_code=404,
             detail=str(error),
         ) from error
 
-    except (
-        organization_service.InviteExpired,
-        organization_service.InviteAlreadyAccepted,
-    ) as error:
-        raise HTTPException(
-            status_code=410,
-            detail=str(error),
-        ) from error
+    user = database.get(UserRecord, membership.user_id)
 
     return OrganizationMember(
         membership_id=membership.membership_id,
+        organization_id=membership.organization_id,
         user_id=membership.user_id,
         role=membership.role,
         joined_at=membership.joined_at,
-        email=current_user.email,
-        full_name=current_user.full_name,
+        email=user.email,
+        full_name=user.full_name,
     )
 
 
@@ -258,3 +225,268 @@ def remove_organization_member(
             status_code=404,
             detail=str(error),
         ) from error
+
+
+@router.get(
+    "/invites",
+    response_model=list[OrganizationInvite],
+)
+def list_pending_invites(
+    database: Session = Depends(get_db),
+    current_organization: CurrentOrganization = Depends(
+        get_current_organization
+    ),
+):
+    return organization_service.list_pending_invites(
+        database=database,
+        organization_id=(
+            current_organization.organization.organization_id
+        ),
+    )
+
+
+@router.post(
+    "/members/invite",
+    response_model=OrganizationInvite,
+    status_code=201,
+    responses={
+        403: {
+            "description": (
+                "Only an owner or admin can invite members"
+            ),
+        },
+    },
+)
+def invite_organization_member(
+    body: InviteMemberRequest,
+    database: Session = Depends(get_db),
+    current_user: UserRecord = Depends(get_current_user),
+    current_organization: CurrentOrganization = Depends(
+        get_current_organization
+    ),
+):
+    try:
+        invite = organization_service.invite_member(
+            database=database,
+            organization=current_organization.organization,
+            invited_email=str(body.email),
+            role=body.role,
+            invited_by=current_user,
+        )
+
+    except organization_service.InsufficientPermission as error:
+        raise HTTPException(
+            status_code=403,
+            detail=str(error),
+        ) from error
+
+    return invite
+
+
+@router.delete(
+    "/invites/{invite_id}",
+    status_code=204,
+    responses={
+        403: {
+            "description": (
+                "Only an owner or admin can cancel invites"
+            ),
+        },
+        404: {
+            "description": "No pending invite found with this ID",
+        },
+        409: {
+            "description": (
+                "This invite has already been accepted"
+            ),
+        },
+    },
+)
+def cancel_organization_invite(
+    invite_id: str,
+    database: Session = Depends(get_db),
+    current_user: UserRecord = Depends(get_current_user),
+    current_organization: CurrentOrganization = Depends(
+        get_current_organization
+    ),
+):
+    try:
+        organization_service.cancel_invite(
+            database=database,
+            organization=current_organization.organization,
+            invite_id=invite_id,
+            cancelled_by=current_user,
+        )
+
+    except organization_service.InsufficientPermission as error:
+        raise HTTPException(
+            status_code=403,
+            detail=str(error),
+        ) from error
+
+    except organization_service.InviteNotFound as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error),
+        ) from error
+
+    except organization_service.InviteAlreadyAccepted as error:
+        raise HTTPException(
+            status_code=409,
+            detail=str(error),
+        ) from error
+
+
+@router.post(
+    "/invites/{invite_id}/resend",
+    response_model=OrganizationInvite,
+    responses={
+        403: {
+            "description": (
+                "Only an owner or admin can resend invites"
+            ),
+        },
+        404: {
+            "description": "No pending invite found with this ID",
+        },
+        409: {
+            "description": (
+                "This invite has already been accepted"
+            ),
+        },
+    },
+)
+def resend_organization_invite(
+    invite_id: str,
+    database: Session = Depends(get_db),
+    current_user: UserRecord = Depends(get_current_user),
+    current_organization: CurrentOrganization = Depends(
+        get_current_organization
+    ),
+):
+    try:
+        return organization_service.resend_invite(
+            database=database,
+            organization=current_organization.organization,
+            invite_id=invite_id,
+            resent_by=current_user,
+        )
+
+    except organization_service.InsufficientPermission as error:
+        raise HTTPException(
+            status_code=403,
+            detail=str(error),
+        ) from error
+
+    except organization_service.InviteNotFound as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error),
+        ) from error
+
+    except organization_service.InviteAlreadyAccepted as error:
+        raise HTTPException(
+            status_code=409,
+            detail=str(error),
+        ) from error
+
+
+@router.get(
+    "/invites/{token}/preview",
+    response_model=OrganizationInvitePreview,
+    responses={
+        404: {
+            "description": "This invite link is not valid",
+        },
+    },
+)
+def preview_invite(
+    token: str,
+    database: Session = Depends(get_db),
+):
+    """
+    No authentication required — this is what the accept-invite
+    page calls before the person has even logged in, to show
+    "you're invited to join X as Y".
+    """
+
+    try:
+        invite, organization = (
+            organization_service.get_invite_preview(
+                database=database,
+                token=token,
+            )
+        )
+
+    except organization_service.InviteNotFound as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error),
+        ) from error
+
+    from datetime import datetime, timezone
+
+    expires_at = invite.expires_at
+
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    return OrganizationInvitePreview(
+        organization_name=organization.name,
+        invited_email=invite.invited_email,
+        role=invite.role,
+        is_expired=expires_at <= datetime.now(timezone.utc),
+        is_accepted=invite.accepted_at is not None,
+    )
+
+
+@router.post(
+    "/invites/{token}/accept",
+    response_model=OrganizationMember,
+    responses={
+        404: {
+            "description": "This invite link is not valid",
+        },
+        410: {
+            "description": (
+                "This invite has already been used or expired"
+            ),
+        },
+    },
+)
+def accept_organization_invite(
+    token: str,
+    database: Session = Depends(get_db),
+    current_user: UserRecord = Depends(get_current_user),
+):
+    try:
+        membership = organization_service.accept_invite(
+            database=database,
+            token=token,
+            accepting_user=current_user,
+        )
+
+    except organization_service.InviteNotFound as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error),
+        ) from error
+
+    except (
+        organization_service.InviteExpired,
+        organization_service.InviteAlreadyAccepted,
+    ) as error:
+        raise HTTPException(
+            status_code=410,
+            detail=str(error),
+        ) from error
+
+    return OrganizationMember(
+        membership_id=membership.membership_id,
+        organization_id=membership.organization_id,
+        user_id=membership.user_id,
+        role=membership.role,
+        joined_at=membership.joined_at,
+        email=current_user.email,
+        full_name=current_user.full_name,
+    )
