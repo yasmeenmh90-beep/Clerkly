@@ -25,6 +25,7 @@ from app.database import SessionLocal
 from app.models.organization_record import OrganizationRecord
 from app.models.task_record import TaskRecord
 
+from app.api.policy import router as policy_router
 logging.basicConfig(
     level=getattr(
         logging,
@@ -140,6 +141,7 @@ app.include_router(signature_intake_router)
 app.include_router(payments_router)
 app.include_router(webhook_router)
 app.include_router(paperwork_watch_router)
+app.include_router(policy_router)
 
 @app.get("/")
 def root():

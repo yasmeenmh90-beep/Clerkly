@@ -134,6 +134,12 @@ class Settings:
 
     log_level: str
 
+    # Bumped whenever the Terms of Service / Privacy Policy
+    # text actually changes. Anyone whose last acceptance
+    # doesn't match this gets prompted to accept again — see
+    # app/services/policy_service.py.
+    current_policy_version: str
+
     @property
     def max_upload_size_bytes(self) -> int:
         return self.max_upload_size_mb * 1024 * 1024
@@ -321,6 +327,10 @@ def load_settings() -> Settings:
             "LOG_LEVEL",
             "INFO",
         ).upper(),
+        current_policy_version=os.getenv(
+            "CURRENT_POLICY_VERSION",
+            "1.0",
+        ),
     )
 
 

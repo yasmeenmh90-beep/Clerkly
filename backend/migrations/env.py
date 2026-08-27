@@ -17,6 +17,8 @@ from app.models.organization_record import OrganizationRecord  # noqa: F401
 from app.models.organization_member_record import OrganizationMemberRecord  # noqa: F401
 from app.models.organization_invite_record import OrganizationInviteRecord  # noqa: F401
 
+from app.models.policy_acceptance_record import PolicyAcceptanceRecord  # noqa: F401
+
 config = context.config
 
 database_url = os.getenv(
