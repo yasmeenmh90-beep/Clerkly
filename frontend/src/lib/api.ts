@@ -768,12 +768,13 @@ export async function getActivity(): Promise<Activity[]> {
       )
     })
     .map(({ task, event }) => ({
-      activity_id: String(event.event_id),
+        activity_id: String(event.event_id),
       title: formatEventTitle(event.event_type),
       description:
         event.message ??
         `${task.title}: ${event.event_type.replaceAll("_", " ")}`,
       timestamp: formatTimestamp(event.created_at),
+      raw_timestamp: event.created_at,
       type: mapEventToActivityType(event.event_type),
     }))
 }

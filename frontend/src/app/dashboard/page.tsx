@@ -31,13 +31,20 @@ import {
 } from "@/components/dashboard/ProcessingDocuments"
 
 import {
-  RecentActivity,
-} from "@/components/dashboard/RecentActivity"
+ActivityOverview,
+} from "@/components/dashboard/ActivityOverview"
 
 import {
-  UpcomingDeadlines,
-} from "@/components/dashboard/UpcomingDeadlines"
+AISourceBreakdown,
+} from "@/components/dashboard/AISourceBreakdown"
 
+import {
+TaskStatusBreakdown,
+} from "@/components/dashboard/TaskStatusBreakdown"
+
+import {
+UpcomingDeadlines,
+} from "@/components/dashboard/UpcomingDeadlines"
 
 function getGreeting(): string {
   const currentHour = new Date().getHours()
@@ -142,20 +149,23 @@ function DashboardContent() {
 
 
         <div className="flex flex-col gap-6">
-          <div className="flex-1">
-            <ProcessingDocuments
-              searchQuery={query}
-            />
-          </div>
+<div className="flex-1">
+<ProcessingDocuments
+searchQuery={query}
+/>
+</div>
+</div>
+</div>
 
-          <div className="flex-1">
-            <RecentActivity
-              searchQuery={query}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
+
+<div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+<AISourceBreakdown />
+<TaskStatusBreakdown />
+</div>
+
+
+<ActivityOverview searchQuery={query} />
+</div>
   )
 }
 

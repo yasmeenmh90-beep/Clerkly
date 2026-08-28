@@ -6,6 +6,10 @@ import { useState, useEffect } from "react"
 import { getActivity } from "@/lib/api"
 import { Activity } from "@/types"
 
+import { ActivityOverTime } from "@/components/dashboard/ActivityOverTime"
+import { AISourceBreakdown } from "@/components/dashboard/AISourceBreakdown"
+import { TaskStatusBreakdown } from "@/components/dashboard/TaskStatusBreakdown"
+
 const typeIcons = {
   document_uploaded: Upload,
   task_created: Play,
@@ -70,7 +74,7 @@ export default function ActivityPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-8">
+    <div className="max-w-5xl mx-auto space-y-8 pb-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-foreground tracking-tight">System Activity</h2>
@@ -89,7 +93,18 @@ export default function ActivityPage() {
         </div>
       </div>
 
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <AISourceBreakdown />
+        <TaskStatusBreakdown />
+      </div>
+
+      <ActivityOverTime />
+
       <div className="bg-card border border-border rounded-xl shadow-sm p-6 md:p-8">
+        <h3 className="text-lg font-semibold text-foreground tracking-tight mb-4">
+          Full Timeline
+        </h3>
+
         {filteredActivities.length === 0 ? (
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
@@ -102,7 +117,7 @@ export default function ActivityPage() {
             <p className="text-sm max-w-sm mx-auto">There are no activities matching your current search.</p>
           </motion.div>
         ) : (
-          <div className="relative border-l-2 border-border/60 ml-4 md:ml-8 space-y-10 py-4">
+          <div className="relative border-l-2 border-border/60 ml-4 md:ml-8 space-y-10 py-4 max-h-[600px] overflow-y-auto pr-4 pl-6">
             {filteredActivities.map((activity, i) => {
               const Icon = typeIcons[activity.type] || Play;
               const colorClass = typeColors[activity.type] || "bg-accent text-foreground border-border";

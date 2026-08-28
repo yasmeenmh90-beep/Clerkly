@@ -82,6 +82,7 @@ export interface Activity {
   title: string
   description: string
   timestamp: string
+  raw_timestamp: string
   type: ActivityType
 }
 
