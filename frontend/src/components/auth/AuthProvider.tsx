@@ -18,6 +18,7 @@ import {
   getCurrentOrganizationId,
   getCurrentUser,
   getOrganizations,
+  getPolicyStatus,
   isAuthenticated as hasAccessToken,
   logout,
   setCurrentOrganizationId,
@@ -36,6 +37,13 @@ interface AuthContextValue {
   isLoadingOrganizations: boolean
   switchOrganization: (organizationId: string) => void
   refreshOrganizations: () => Promise<void>
+
+  // Policy acceptance state
+  policyAccepted: boolean
+  isPolicyLoading: boolean
+  policyError: string | null
+  recheckPolicy: () => Promise<void>
+  onPolicyAccepted: () => void
 }
 
 
@@ -68,6 +76,57 @@ export function AuthProvider({
     isLoadingOrganizations,
     setIsLoadingOrganizations,
   ] = useState(true)
+
+  // Policy state — defaults to false so the user is
+  // never silently allowed through if the check fails.
+  const [policyAccepted, setPolicyAccepted] =
+    useState(false)
+
+  const [isPolicyLoading, setIsPolicyLoading] =
+    useState(false)
+
+  const [policyError, setPolicyError] =
+    useState<string | null>(null)
+
+
+  // ── Policy status check ──────────────────────────
+  // Fetches GET /policy/status for the current user.
+  // Called once after authentication is established.
+  const recheckPolicy =
+    useCallback(async (): Promise<void> => {
+      if (!hasAccessToken()) {
+        setPolicyAccepted(false)
+        setIsPolicyLoading(false)
+        setPolicyError(null)
+        return
+      }
+
+      try {
+        setIsPolicyLoading(true)
+        setPolicyError(null)
+
+        const status = await getPolicyStatus()
+
+        setPolicyAccepted(status.accepted === true)
+      } catch {
+        // Do NOT default to accepted on failure.
+        setPolicyAccepted(false)
+        setPolicyError(
+          "Unable to verify your policy acceptance status. Please try again.",
+        )
+      } finally {
+        setIsPolicyLoading(false)
+      }
+    }, [])
+
+
+  // Allows the PolicyAgreementModal to update local
+  // state immediately after a successful POST, without
+  // requiring a full page reload or re-fetch.
+  const onPolicyAccepted = useCallback((): void => {
+    setPolicyAccepted(true)
+    setPolicyError(null)
+  }, [])
 
 
   const refreshOrganizations =
@@ -140,14 +199,19 @@ export function AuthProvider({
 
         setUser(currentUser)
 
-        await refreshOrganizations()
+        // Fetch organizations and policy status in
+        // parallel once the user is authenticated.
+        await Promise.all([
+          refreshOrganizations(),
+          recheckPolicy(),
+        ])
       } catch {
         clearAccessToken()
         setUser(null)
       } finally {
         setIsLoading(false)
       }
-    }, [refreshOrganizations])
+    }, [refreshOrganizations, recheckPolicy])
 
 
   useEffect(() => {
@@ -164,6 +228,8 @@ export function AuthProvider({
     setUser(null)
     setOrganizations([])
     setCurrentOrganizationIdState(null)
+    setPolicyAccepted(false)
+    setPolicyError(null)
   }, [])
 
 
@@ -190,6 +256,11 @@ export function AuthProvider({
         isLoadingOrganizations,
         switchOrganization,
         refreshOrganizations,
+        policyAccepted,
+        isPolicyLoading,
+        policyError,
+        recheckPolicy,
+        onPolicyAccepted,
       }),
       [
         user,
@@ -201,6 +272,11 @@ export function AuthProvider({
         isLoadingOrganizations,
         switchOrganization,
         refreshOrganizations,
+        policyAccepted,
+        isPolicyLoading,
+        policyError,
+        recheckPolicy,
+        onPolicyAccepted,
       ],
     )
 
