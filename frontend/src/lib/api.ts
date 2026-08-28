@@ -816,3 +816,66 @@ export async function getNotifications(): Promise<
     type: mapActivityToNotificationType(activity),
   }))
 }
+
+
+// ==================================================
+// Policy / Agreement API
+// ==================================================
+
+/**
+ * The current policy version the frontend requires
+ * users to accept. Keep this centralised — do not
+ * scatter the literal "1.0" across multiple files.
+ */
+export const CURRENT_POLICY_VERSION = "1.0"
+
+
+/**
+ * Shape returned by GET /policy/status.
+ *
+ * The exact backend schema has not been verified locally
+ * (the backend code is maintained separately). The type
+ * below is intentionally defensive — the component logic
+ * depends only on the `accepted` boolean. Extra fields
+ * are typed as optional so the frontend degrades
+ * gracefully if they are absent.
+ */
+export interface PolicyStatusResponse {
+  accepted: boolean
+  current_version?: string
+  accepted_version?: string | null
+  accepted_at?: string | null
+}
+
+
+/**
+ * Shape returned by POST /policy/accept.
+ *
+ * Same caveat as PolicyStatusResponse — the exact
+ * backend response may include additional fields.
+ */
+export interface PolicyAcceptResponse {
+  accepted: boolean
+  version?: string
+  accepted_at?: string | null
+}
+
+
+export async function getPolicyStatus(): Promise<
+  PolicyStatusResponse
+> {
+  return request<PolicyStatusResponse>("/policy/status")
+}
+
+
+export async function acceptPolicy(
+  version: string,
+): Promise<PolicyAcceptResponse> {
+  return request<PolicyAcceptResponse>(
+    "/policy/accept",
+    {
+      method: "POST",
+      body: JSON.stringify({ version }),
+    },
+  )
+}
