@@ -875,7 +875,7 @@ export async function acceptPolicy(
     "/policy/accept",
     {
       method: "POST",
-      body: JSON.stringify({ version }),
+      body: JSON.stringify({ policy_version: version }),
     },
   )
 }

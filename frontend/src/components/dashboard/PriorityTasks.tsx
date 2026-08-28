@@ -193,7 +193,7 @@ export function PriorityTasks({
       </div>
 
 
-      <div className="relative min-h-[200px] flex-1 divide-y divide-border">
+        <div className="relative min-h-[200px] max-h-[420px] flex-1 divide-y divide-border overflow-y-auto">
         {isLoading ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -218,7 +218,6 @@ export function PriorityTasks({
           </div>
         ) : (
           priorityTasks
-            .slice(0, 4)
             .map((task, index) => (
               <motion.button
                 type="button"

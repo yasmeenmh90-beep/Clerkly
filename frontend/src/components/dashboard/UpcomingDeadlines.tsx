@@ -212,7 +212,7 @@ export function UpcomingDeadlines({
       </div>
 
 
-      <div className="relative min-h-[200px] flex-1 p-5">
+      <div className="relative min-h-[200px] max-h-[420px] flex-1 p-5 overflow-y-auto">
         {isLoading ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -242,7 +242,6 @@ export function UpcomingDeadlines({
         ) : (
           <div className="space-y-4">
             {upcomingTasks
-              .slice(0, 4)
               .map((task, index) => {
                 const deadline =
                   task.deadline as string

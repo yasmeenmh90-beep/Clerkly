@@ -55,7 +55,7 @@ export function RecentActivity({ searchQuery }: { searchQuery?: string }) {
         <p className="text-xs text-muted-foreground mt-1">Latest system events</p>
       </div>
       
-      <div className="p-5 flex-1 relative min-h-[200px]">
+      <div className="p-5 flex-1 relative min-h-[200px] max-h-[420px] overflow-y-auto">
         {isLoading ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
