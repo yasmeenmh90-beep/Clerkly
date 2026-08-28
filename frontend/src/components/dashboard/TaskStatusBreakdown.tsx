@@ -137,7 +137,7 @@ export function TaskStatusBreakdown() {
                 tick={{ fontSize: 12 }}
               />
               <Tooltip
-                formatter={(value: number) => [
+                formatter={(value: any) => [
                   `${value} task${value === 1 ? "" : "s"}`,
                   "",
                 ]}
