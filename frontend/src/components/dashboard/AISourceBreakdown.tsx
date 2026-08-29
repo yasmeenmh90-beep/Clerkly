@@ -1,105 +1,58 @@
 "use client"
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react"
+import { useEffect, useMemo, useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { AlertTriangle, Cpu, Shield } from "lucide-react"
 
-import {
-  AnimatePresence,
-  motion,
-} from "framer-motion"
-
-import {
-  AlertTriangle,
-  Cpu,
-  Loader2,
-  Shield,
-} from "lucide-react"
-
-import {
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Sector,
-} from "recharts"
+import ReactECharts from "echarts-for-react"
+import * as echarts from "echarts/core"
 
 import type { Task } from "@/types"
 import { getTasks } from "@/lib/api"
 
-
-// ── Source metadata ────────────────────────────────
-
 const SOURCE_LABELS: Record<string, string> = {
-  strands: "Amazon Bedrock",
+  strands: "AWS Bedrock",
   openai_fallback: "OpenAI",
-  deterministic_fallback: "Rule-based fallback",
+  deterministic_fallback: "Rule-Based Fallback",
 }
 
 const SOURCE_COLORS: Record<string, string> = {
-  strands: "#22c55e",
+  strands: "#a855f7",
   openai_fallback: "#3b82f6",
-  deterministic_fallback: "#f59e0b",
+  deterministic_fallback: "#22c55e",
 }
 
 const SOURCE_GRADIENTS: Record<string, [string, string]> = {
-  strands: ["#4ade80", "#16a34a"], // Premium emerald gradient
-  openai_fallback: ["#60a5fa", "#2563eb"], // Premium blue gradient
-  deterministic_fallback: ["#fbbf24", "#d97706"], // Premium amber gradient
+  strands: ["#c084fc", "#a855f7"],
+  openai_fallback: ["#60a5fa", "#3b82f6"],
+  deterministic_fallback: ["#4ade80", "#22c55e"],
 }
 
-const SOURCE_ORDER = [
-  "strands",
-  "openai_fallback",
-  "deterministic_fallback",
-]
+const SOURCE_GRADIENTS_DARK: Record<string, [string, string]> = {
+  strands: ["#7e22ce", "#581c87"],
+  openai_fallback: ["#1d4ed8", "#1e3a8a"],
+  deterministic_fallback: ["#15803d", "#14532d"],
+}
 
-
-// ── Chart data entry type ──────────────────────────
+const SOURCE_ORDER = ["strands", "openai_fallback", "deterministic_fallback"]
 
 interface ChartEntry {
   name: string
   value: number
   color: string
   gradient: [string, string]
+  darkGradient: [string, string]
   sourceKey: string
 }
-
-// ── Active-segment renderer (recharts) ─────────────
-
-function renderActiveShape(props: any) {
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props
-
-  return (
-    <g style={{ filter: "drop-shadow(0 0 12px rgba(255,255,255,0.15))" }}>
-      <Sector
-        cx={cx}
-        cy={cy}
-        innerRadius={innerRadius}
-        outerRadius={(outerRadius as number) + 6}
-        startAngle={startAngle}
-        endAngle={endAngle}
-        fill={fill}
-        opacity={1}
-        style={{
-          filter: "url(#donut-bevel-active)",
-          transition: "all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
-        }}
-      />
-    </g>
-  )
-}
-
-// ── Main component ─────────────────────────────────
 
 export function AISourceBreakdown() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeIndex, setActiveIndex] = useState(-1)
+  
+  // To sync react state with echarts hover
+  const [hoveredIndex, setHoveredIndex] = useState<number>(-1)
+  const [hoveredData, setHoveredData] = useState<ChartEntry | null>(null)
 
   useEffect(() => {
     async function fetchTasks(): Promise<void> {
@@ -116,19 +69,12 @@ export function AISourceBreakdown() {
       }
     }
 
-    function handleTaskUpdate(): void {
-      void fetchTasks()
-    }
-
     void fetchTasks()
-
-    window.addEventListener("task-updated", handleTaskUpdate)
-    return () => {
-      window.removeEventListener("task-updated", handleTaskUpdate)
-    }
+    window.addEventListener("task-updated", fetchTasks)
+    return () => window.removeEventListener("task-updated", fetchTasks)
   }, [])
 
-  const chartData = useMemo<ChartEntry[]>(() => {
+  const chartData = useMemo(() => {
     const counts: Record<string, number> = {}
 
     for (const task of tasks) {
@@ -138,353 +84,284 @@ export function AISourceBreakdown() {
     }
 
     const ordered = SOURCE_ORDER.filter((key) => counts[key] !== undefined)
-    const rest = Object.keys(counts).filter(
-      (key) => !SOURCE_ORDER.includes(key),
-    )
+    const rest = Object.keys(counts).filter((key) => !SOURCE_ORDER.includes(key))
 
     return [...ordered, ...rest].map((source) => ({
       name: SOURCE_LABELS[source] ?? source,
       value: counts[source],
       color: SOURCE_COLORS[source] ?? "#94a3b8",
       gradient: SOURCE_GRADIENTS[source] ?? ["#94a3b8", "#64748b"],
+      darkGradient: SOURCE_GRADIENTS_DARK[source] ?? ["#475569", "#334155"],
       sourceKey: source,
     }))
   }, [tasks])
 
-  const totalAnalyzed = useMemo(
-    () => chartData.reduce((sum, entry) => sum + entry.value, 0),
-    [chartData],
-  )
+  const totalAnalyzed = useMemo(() => chartData.reduce((sum, entry) => sum + entry.value, 0), [chartData])
 
-  const fallbackEntry = useMemo(
-    () => chartData.find((e) => e.sourceKey === "deterministic_fallback"),
-    [chartData],
-  )
-
+  const fallbackEntry = useMemo(() => chartData.find((e) => e.sourceKey === "deterministic_fallback"), [chartData])
   const fallbackRate = useMemo(() => {
-    if (totalAnalyzed === 0 || !fallbackEntry) return 0
-    return Math.round((fallbackEntry.value / totalAnalyzed) * 100)
+    if (totalAnalyzed === 0 || !fallbackEntry) return "0.0"
+    return ((fallbackEntry.value / totalAnalyzed) * 100).toFixed(1)
   }, [totalAnalyzed, fallbackEntry])
 
-  const onPieEnter = useCallback(
-    (_: unknown, index: number) => setActiveIndex(index),
-    [],
-  )
+  // Generate ECharts option for a stacked 3D pie
+  const option = useMemo(() => {
+    const layers = 15;
+    const series = [];
 
-  const onPieLeave = useCallback(
-    () => setActiveIndex(-1),
-    [],
-  )
+    // Helper to generate ECharts LinearGradient objects
+    const getGradient = (colors: [string, string]) => {
+      return new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: colors[0] },
+        { offset: 1, color: colors[1] }
+      ])
+    }
+
+    for (let i = 0; i < layers; i++) {
+      const isTop = i === layers - 1;
+      
+      series.push({
+        type: 'pie',
+        radius: ['55%', '85%'],
+        // shift downward to create depth
+        center: ['50%', `calc(45% + ${(layers - i) * 1.5}px)`],
+        silent: !isTop, // only hover top layer
+        animation: isTop, // only animate top layer to save performance
+        data: chartData.map((d) => ({
+          name: d.name,
+          value: d.value,
+          itemStyle: {
+            color: isTop ? getGradient(d.gradient) : getGradient(d.darkGradient),
+            borderWidth: isTop ? 1 : 0,
+            borderColor: isTop ? 'rgba(255,255,255,0.2)' : 'transparent',
+          }
+        })),
+        itemStyle: {
+          borderRadius: 2,
+        },
+        label: {
+          show: isTop,
+          position: 'inside',
+          formatter: (params: { percent: number }) => {
+            if (params.percent < 5) return '';
+            return `{val|${params.percent.toFixed(1)}%}`;
+          },
+          rich: {
+            val: {
+              color: '#fff',
+              fontSize: 12,
+              fontWeight: 'bold',
+              textShadowColor: 'rgba(0,0,0,0.5)',
+              textShadowBlur: 4,
+              textShadowOffsetY: 2
+            }
+          }
+        },
+        labelLine: { show: false },
+        emphasis: {
+          scaleSize: 10,
+          itemStyle: {
+            shadowBlur: 20,
+            shadowColor: 'rgba(0,0,0,0.5)'
+          }
+        }
+      });
+    }
+
+    return {
+      tooltip: { show: false }, // we use custom react tooltip
+      series
+    }
+  }, [chartData])
+
+  // Listen to echarts events
+  const onEvents = {
+    mouseover: (params: { dataIndex: number }) => {
+      setHoveredIndex(params.dataIndex)
+      setHoveredData(chartData[params.dataIndex])
+    },
+    mouseout: () => {
+      setHoveredIndex(-1)
+      setHoveredData(null)
+    }
+  }
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
-      className="flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm transition-shadow duration-300 hover:shadow-md"
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="flex h-full flex-col overflow-hidden rounded-xl border border-border/40 bg-card shadow-lg transition-shadow duration-300"
     >
-      {/* ── Header ── */}
-      <div className="flex items-center gap-3 border-b border-border bg-muted/10 p-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-          <Cpu className="h-4.5 w-4.5 text-primary" />
-        </div>
+      <div className="flex items-center gap-3 border-b border-border/40 bg-card p-5">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">
             AI Source Breakdown
           </h2>
-          <p className="text-xs text-muted-foreground">
-            Which layer actually analyzed each document
+          <p className="mt-1 text-xs text-muted-foreground">
+            Distribution of tasks processed by AI sources
           </p>
         </div>
       </div>
 
-      {/* ── Body ── */}
       <div className="relative flex-1 p-5">
         {isLoading ? (
-          <div className="flex min-h-[320px] items-center justify-center">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex flex-col items-center gap-3 text-muted-foreground"
-            >
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <span className="text-xs">Loading analysis data…</span>
-            </motion.div>
+          <div className="flex min-h-[400px] items-center justify-center">
+            <Cpu className="h-6 w-6 animate-pulse text-muted-foreground" />
           </div>
         ) : error ? (
-          <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 p-4 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-danger/10">
-              <AlertTriangle className="h-5 w-5 text-danger" />
-            </div>
-            <p className="text-sm font-medium text-foreground">{error}</p>
-            <p className="max-w-[220px] text-xs text-muted-foreground">
-              Check your connection and try refreshing the page.
-            </p>
+          <div className="flex min-h-[400px] items-center justify-center">
+            <AlertTriangle className="h-5 w-5 text-danger" />
           </div>
         ) : totalAnalyzed === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex min-h-[320px] flex-col items-center justify-center p-4 text-center"
-          >
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted/50">
-              <Cpu className="h-5 w-5 text-muted-foreground opacity-50" />
-            </div>
-            <p className="text-sm font-medium text-foreground">
-              0 Total Processed
-            </p>
-            <p className="mt-1 max-w-[220px] text-xs text-muted-foreground">
-              Upload a document or sync email to see the AI resilience breakdown.
-            </p>
-          </motion.div>
+          <div className="flex min-h-[400px] flex-col items-center justify-center text-center">
+            <Cpu className="mb-3 h-8 w-8 text-muted-foreground opacity-50" />
+            <p className="text-sm font-medium text-foreground">0 Tasks Processed</p>
+          </div>
         ) : (
-          <div className="flex flex-col gap-6">
-            {/* ── 3D Donut Chart ── */}
-            <div className="relative mx-auto w-full max-w-[280px]">
+          <div className="flex h-full flex-col">
+            
+            {/* ── 3D Donut Area ── */}
+            <div className="relative flex min-h-[260px] w-full items-center justify-center">
+              
               {/* Dynamic ambient glow */}
               <div
-                className="pointer-events-none absolute inset-0 m-auto h-[200px] w-[200px] rounded-full opacity-40 blur-3xl transition-colors duration-500"
+                className="pointer-events-none absolute left-1/2 top-1/2 h-[220px] w-[220px] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-30 blur-[40px] transition-colors duration-500"
                 style={{
-                  background: activeIndex >= 0 ? chartData[activeIndex].color : "var(--primary)",
-                  opacity: activeIndex >= 0 ? 0.25 : 0.1,
+                  background: hoveredIndex >= 0 ? chartData[hoveredIndex].color : "var(--primary)",
+                  opacity: hoveredIndex >= 0 ? 0.35 : 0.15,
                 }}
               />
 
-              {/* Chart container with perspective & subtle floating animation */}
+              {/* Chart container with perspective */}
               <motion.div
-                animate={{ y: [0, -6, 0] }}
-                transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-                className="relative h-[240px]"
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+                className="relative h-[280px] w-full max-w-[340px]"
               >
-                <div
+                {/* ScaleY creates the 3D isometric perspective */}
+                <div 
                   className="absolute inset-0"
-                  style={{
-                    transform: "rotateX(35deg) scale(1.05)",
+                  style={{ 
+                    transform: "scaleY(0.65) scaleX(1.1)", 
                     transformOrigin: "center center",
-                    filter: "drop-shadow(0px 20px 15px rgba(0,0,0,0.45)) drop-shadow(0px 4px 6px rgba(0,0,0,0.2))"
+                    filter: "drop-shadow(0px 30px 20px rgba(0,0,0,0.6))"
                   }}
                 >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <defs>
-                        {/* 3D Bevel Filter for default state */}
-                        <filter id="donut-bevel" x="-20%" y="-20%" width="140%" height="140%">
-                          <feComponentTransfer in="SourceAlpha" result="alpha" />
-                          <feOffset dx="-2" dy="-2" in="alpha" result="offsetTop" />
-                          <feGaussianBlur stdDeviation="2" in="offsetTop" result="blurTop" />
-                          <feComposite operator="out" in2="blurTop" in="SourceAlpha" result="highlightMask" />
-                          <feFlood floodColor="#ffffff" floodOpacity="0.4" result="highlightColor" />
-                          <feComposite operator="in" in2="highlightMask" in="highlightColor" result="highlight" />
+                  <ReactECharts
+                    option={option}
+                    onEvents={onEvents}
+                    style={{ height: '100%', width: '100%' }}
+                    opts={{ renderer: 'svg' }}
+                  />
+                </div>
 
-                          <feOffset dx="2" dy="8" in="alpha" result="offsetBottom" />
-                          <feGaussianBlur stdDeviation="4" in="offsetBottom" result="blurBottom" />
-                          <feComposite operator="out" in2="blurBottom" in="SourceAlpha" result="shadowMask" />
-                          <feFlood floodColor="#000000" floodOpacity="0.6" result="shadowColor" />
-                          <feComposite operator="in" in2="shadowMask" in="shadowColor" result="innerShadow" />
-
-                          <feMerge>
-                            <feMergeNode in="SourceGraphic" />
-                            <feMergeNode in="highlight" />
-                            <feMergeNode in="innerShadow" />
-                          </feMerge>
-                        </filter>
-
-                        {/* 3D Bevel Filter for hover state (brighter, less deep) */}
-                        <filter id="donut-bevel-active" x="-20%" y="-20%" width="140%" height="140%">
-                          <feComponentTransfer in="SourceAlpha" result="alpha" />
-                          <feOffset dx="-1" dy="-1" in="alpha" result="offsetTop" />
-                          <feGaussianBlur stdDeviation="1.5" in="offsetTop" result="blurTop" />
-                          <feComposite operator="out" in2="blurTop" in="SourceAlpha" result="highlightMask" />
-                          <feFlood floodColor="#ffffff" floodOpacity="0.65" result="highlightColor" />
-                          <feComposite operator="in" in2="highlightMask" in="highlightColor" result="highlight" />
-
-                          <feOffset dx="2" dy="5" in="alpha" result="offsetBottom" />
-                          <feGaussianBlur stdDeviation="3" in="offsetBottom" result="blurBottom" />
-                          <feComposite operator="out" in2="blurBottom" in="SourceAlpha" result="shadowMask" />
-                          <feFlood floodColor="#000000" floodOpacity="0.4" result="shadowColor" />
-                          <feComposite operator="in" in2="shadowMask" in="shadowColor" result="innerShadow" />
-
-                          <feMerge>
-                            <feMergeNode in="SourceGraphic" />
-                            <feMergeNode in="highlight" />
-                            <feMergeNode in="innerShadow" />
-                          </feMerge>
-                        </filter>
-
-                        {chartData.map((entry) => (
-                          <linearGradient
-                            key={entry.sourceKey}
-                            id={`gradient-${entry.sourceKey}`}
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop offset="0%" stopColor={entry.gradient[0]} stopOpacity={1} />
-                            <stop offset="100%" stopColor={entry.gradient[1]} stopOpacity={1} />
-                          </linearGradient>
-                        ))}
-                      </defs>
-
-                      <Pie
-                        data={chartData}
-                        dataKey="value"
-                        nameKey="name"
-                        innerRadius={68}
-                        outerRadius={95}
-                        paddingAngle={3}
-                        cornerRadius={6}
-                        {...({ activeIndex: activeIndex >= 0 ? activeIndex : undefined } as any)}
-                        activeShape={renderActiveShape}
-                        onMouseEnter={onPieEnter}
-                        onMouseLeave={onPieLeave}
-                        animationBegin={100}
-                        animationDuration={900}
-                        animationEasing="ease-out"
-                        stroke="none"
-                      >
-                        {chartData.map((entry) => (
-                          <Cell
-                            key={entry.sourceKey}
-                            fill={`url(#gradient-${entry.sourceKey})`}
-                            style={{
-                              filter: "url(#donut-bevel)",
-                              transition: "all 0.3s ease",
-                            }}
-                          />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
+                {/* ── Center Content ── */}
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center pt-3">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                    Total
+                  </span>
+                  <span className="mt-1 text-4xl font-extrabold tracking-tighter text-foreground drop-shadow-md">
+                    {totalAnalyzed}
+                  </span>
                 </div>
               </motion.div>
 
-              {/* ── Tooltip Overlay (Unrotated) ── */}
+              {/* ── Hover "Current Selection" Card ── */}
               <AnimatePresence>
-                {activeIndex >= 0 && chartData[activeIndex] && (
+                {hoveredData && (
                   <motion.div
-                    initial={{ opacity: 0, y: 15, scale: 0.9 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                    className="pointer-events-none absolute left-1/2 z-20 flex -translate-x-1/2 flex-col items-center justify-center rounded-xl border border-border/40 bg-card/95 px-3.5 py-2 shadow-2xl backdrop-blur-md"
-                    style={{ top: "12%" }}
+                    initial={{ opacity: 0, x: 20, scale: 0.95 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: 10, scale: 0.95 }}
+                    transition={{ duration: 0.25, ease: "easeOut" }}
+                    className="pointer-events-none absolute right-0 top-1/2 z-20 flex w-36 -translate-y-1/2 flex-col items-center rounded-xl border border-border/50 bg-card/95 p-3 shadow-2xl backdrop-blur-md"
                   >
-                    <div style={{ color: chartData[activeIndex].color }} className="text-xs font-bold tracking-wide">
-                      {chartData[activeIndex].name}
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Current Selection
+                    </span>
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ background: hoveredData.color, boxShadow: `0 0 8px ${hoveredData.color}` }}
+                      />
+                      <span className="text-xs font-bold text-foreground">
+                        {hoveredData.name}
+                      </span>
                     </div>
-                    <div className="mt-0.5 text-[11px] font-medium text-muted-foreground">
-                      {chartData[activeIndex].value} task{chartData[activeIndex].value === 1 ? "" : "s"} &middot;{" "}
-                      {totalAnalyzed > 0
-                        ? Math.round((chartData[activeIndex].value / totalAnalyzed) * 100)
-                        : 0}
-                      %
+                    <span className="mt-2 text-2xl font-bold tracking-tight text-foreground">
+                      {hoveredData.value}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">Tasks</span>
+                    
+                    <div className="mt-3 w-full rounded-md bg-muted/30 py-1.5 text-center border border-border/40">
+                      <span className="text-xs font-bold text-foreground">
+                        {((hoveredData.value / totalAnalyzed) * 100).toFixed(1)}%
+                      </span>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
-
-              {/* ── Center label (Unrotated) ── */}
-              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center pt-1">
-                <motion.span
-                  key={totalAnalyzed}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.5, delay: 0.4 }}
-                  className="text-4xl font-extrabold tracking-tight text-foreground drop-shadow-md"
-                >
-                  {totalAnalyzed.toLocaleString()}
-                </motion.span>
-                <span className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground drop-shadow-sm">
-                  Total Processed
-                </span>
-              </div>
             </div>
 
-            {/* ── Legend ── */}
-            <div className="space-y-2">
+            {/* ── Legends ── */}
+            <div className="mt-4 grid grid-cols-3 gap-3">
               <AnimatePresence>
                 {chartData.map((entry, i) => {
-                  const pct =
-                    totalAnalyzed > 0
-                      ? Math.round((entry.value / totalAnalyzed) * 100)
-                      : 0
-
+                  const pct = totalAnalyzed > 0 ? ((entry.value / totalAnalyzed) * 100).toFixed(1) : "0.0"
                   return (
                     <motion.div
                       key={entry.sourceKey}
-                      initial={{ opacity: 0, x: -12 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{
-                        duration: 0.4,
-                        delay: 0.5 + i * 0.1,
-                        ease: "easeOut"
-                      }}
-                      onMouseEnter={() => setActiveIndex(i)}
-                      onMouseLeave={() => setActiveIndex(-1)}
-                      className={`flex cursor-default items-center gap-3 rounded-lg border px-3.5 py-2.5 transition-all duration-300 ${
-                        activeIndex === i
-                          ? "border-primary/30 bg-primary/10 shadow-sm"
-                          : "border-border/30 bg-muted/10 hover:border-border/60 hover:bg-muted/30"
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, delay: 0.6 + i * 0.1 }}
+                      className={`flex flex-col rounded-xl border p-3 transition-all duration-300 ${
+                        hoveredIndex === i
+                          ? "border-primary/40 bg-primary/5 shadow-md"
+                          : "border-border/40 bg-card"
                       }`}
                     >
-                      {/* Glowing dot */}
-                      <span
-                        className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{
-                          background: `linear-gradient(135deg, ${entry.gradient[0]}, ${entry.gradient[1]})`,
-                          boxShadow: `0 0 10px 1px ${entry.color}80`,
-                        }}
-                      />
-
-                      {/* Source name */}
-                      <span className="flex-1 text-sm font-medium text-foreground">
-                        {entry.name}
-                      </span>
-
-                      {/* Count */}
-                      <span className="text-sm font-medium tabular-nums text-muted-foreground">
-                        {entry.value.toLocaleString()}
-                      </span>
-
-                      {/* Percentage */}
-                      <span className="min-w-[36px] text-right text-sm font-bold tabular-nums text-foreground">
-                        {pct}%
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="h-2.5 w-2.5 rounded-full"
+                          style={{
+                            background: `linear-gradient(135deg, ${entry.gradient[0]}, ${entry.gradient[1]})`,
+                            boxShadow: `0 0 10px 1px ${entry.color}80`,
+                          }}
+                        />
+                        <span className="text-[11px] font-semibold text-foreground">
+                          {entry.name}
+                        </span>
+                      </div>
+                      
+                      <div className="mt-3 flex items-end justify-between">
+                        <span className="text-xl font-bold text-foreground">{entry.value}</span>
+                        <div className="rounded-md bg-muted/40 px-2 py-1 text-[10px] font-bold text-muted-foreground">
+                          {pct}%
+                        </div>
+                      </div>
                     </motion.div>
                   )
                 })}
               </AnimatePresence>
             </div>
 
-            {/* ── Fallback rate metric ── */}
+            {/* ── Fallback rate ── */}
             <motion.div
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.8, ease: "easeOut" }}
-              className="relative overflow-hidden rounded-xl border border-warning/20 bg-gradient-to-r from-warning/10 to-transparent px-4 py-3 shadow-sm"
+              transition={{ duration: 0.5, delay: 0.9 }}
+              className="relative mt-4 flex items-center justify-between overflow-hidden rounded-xl border border-border/40 bg-card p-4 shadow-sm"
             >
-              <div className="pointer-events-none absolute -left-6 top-1/2 h-16 w-16 -translate-y-1/2 rounded-full bg-warning/20 blur-2xl" />
-
-              <div className="relative flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-warning/20 bg-warning/10 shadow-inner">
-                  <Shield className="h-4.5 w-4.5 text-warning" />
+              <div className="flex items-center gap-4">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-success/10 border border-success/20">
+                  <Shield className="h-5 w-5 text-success" />
                 </div>
-
-                <div className="flex-1">
-                  <p className="text-xs font-semibold text-warning/90">
-                    Fallback Rate
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {fallbackEntry
-                      ? `${fallbackEntry.value.toLocaleString()} task${fallbackEntry.value === 1 ? "" : "s"} used fallback`
-                      : "No fallback tasks"}
-                  </p>
+                <div>
+                  <p className="text-xs font-semibold text-foreground">Fallback Rate</p>
+                  <span className="text-2xl font-extrabold text-foreground">{fallbackRate}%</span>
                 </div>
-
-                <span className="text-xl font-bold tabular-nums tracking-tight text-foreground drop-shadow-sm">
-                  {fallbackRate}%
-                </span>
               </div>
             </motion.div>
           </div>
