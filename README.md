@@ -23,6 +23,8 @@ Every step is logged in an audit trail, and anything involving money or a legal 
 
 Paperwork and tasks live inside a **workspace (organization)**, not tied to a single account — every new signup gets a personal workspace automatically, and other people can be invited into it by email, with an owner/admin/member role model. Pending invites can be listed, cancelled, or resent, and a member's role can be changed after the fact.
 
+New users are shown the current Terms of Service and Privacy Policy and must accept it before using the app — if the policy is ever updated, anyone whose acceptance is out of date is prompted again automatically.
+
 ---
 
 ## Architecture
@@ -40,7 +42,7 @@ Clerkly runs three real agents built with the **Strands Agents SDK**:
 2. **OpenAI (GPT-4o)** — tried automatically if Bedrock is unreachable
 3. **Deterministic rule-based extraction** — a last-resort safety net if neither AI provider responds
 
-Each task records which layer actually handled it (`analysis_source` / `plan_source`: `"strands"`, `"openai_fallback"`, or `"deterministic_fallback"`), so it's always clear whether a result came from real AI or the fallback logic.
+Each task records which layer actually handled it (`analysis_source` / `plan_source`: `"strands"`, `"openai_fallback"`, or `"deterministic_fallback"`), so it's always clear whether a result came from real AI or the fallback logic. A dashboard chart shows the live breakdown across all three, alongside a task status overview and an activity-over-time chart.
 
 **Safety by design, not by prompt:** a hardcoded check in the execution layer blocks any task requiring payment or signature from completing without explicit human approval first, regardless of what any agent — or which AI provider — decides. This can't be bypassed by a prompt or a model output.
 
@@ -74,7 +76,7 @@ Traces a single piece of paperwork from intake through AI analysis, planning, hu
 
 **Integrations:** Stripe (payments) · DocuSign eSignature (sandbox, real signing flow) · Gmail API (OAuth, email intake) · SMTP (invite and digest emails)
 
-**Frontend:** Next.js · Tailwind CSS · Framer Motion
+**Frontend:** Next.js · Tailwind CSS · Framer Motion · recharts (dashboard analytics)
 
 ---
 
@@ -109,6 +111,7 @@ You'll need:
 - `DOCUSIGN_INTEGRATION_KEY` / `DOCUSIGN_SECRET_KEY` / `DOCUSIGN_ACCOUNT_ID` / `DOCUSIGN_REDIRECT_URI` — for signature intake (DocuSign developer sandbox)
 - `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` — for payments (Stripe dashboard, test mode)
 - `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM_EMAIL` — for organization invite emails and Paperwork Watch digest emails
+- `CURRENT_POLICY_VERSION` — optional, defaults to `"1.0"`; bump it whenever the Terms/Privacy text actually changes
 - AWS credentials configured locally for Bedrock access (`aws configure` or SSO)
 
 `OPENAI_API_KEY` and `SMTP_*` are both optional — without them, agents skip straight to the deterministic fallback, and invites/digests are still created but not automatically emailed.
@@ -117,7 +120,7 @@ You'll need:
 ```bash
 alembic upgrade head
 ```
-This creates the SQLite database and applies every schema migration (users, tasks, OAuth token fields, payment tracking, signature tracking, AI source tracking, organizations/organization members/invites, and task attribution). Every existing user is automatically given a personal organization as part of this migration; every new signup gets one automatically going forward.
+This creates the SQLite database and applies every schema migration (users, tasks, OAuth token fields, payment tracking, signature tracking, AI source tracking, organizations/organization members/invites, task attribution, and policy acceptance tracking). Every existing user is automatically given a personal organization as part of this migration; every new signup gets one automatically going forward.
 
 ### 6. Start the backend server
 ```bash
@@ -150,15 +153,16 @@ npm run dev
 ```
 The app runs at `http://localhost:3000`.
 
-The multi-user UI — organization switcher, Members & Invites page (invite, view, cancel, resend, change roles), and the accept-invite page — is fully built and tested against the real backend, not mock data. Task cards also show who created and who approved each task.
+The multi-user UI — organization switcher, Members & Invites page (invite, view, cancel, resend, change roles), and the accept-invite page — is fully built and tested against the real backend, not mock data. Task cards also show who created and who approved each task. The dashboard and Activity page include live charts: AI source breakdown, task status breakdown, and activity volume over time.
 
 ---
 
 ## What's actually working (tested end to end)
 
 - Account registration and login (JWT), with an organization automatically created for every new user
+- Terms of Service / Privacy Policy acceptance, with automatic re-prompting on version changes
 - Manual task creation, approval, rejection, and execution
-- Document upload → task creation, with real AI analysis via OpenAI fallback while Bedrock is blocked (see below)
+- Document upload → task creation, with real AI analysis (Bedrock, with automatic OpenAI fallback if unreachable)
 - Real uploaded PDF/DOCX files sent to DocuSign for signature, not just a generated text summary
 - Gmail connection and inbox sync into tasks
 - Stripe payments — real Checkout session, real webhook, task auto-completes on payment
@@ -167,12 +171,13 @@ The multi-user UI — organization switcher, Members & Invites page (invite, vie
 - Organizations — every user gets a personal workspace; inviting, accepting, listing, cancelling, resending, removing, and changing roles all tested via real HTTP requests, with owner/admin/member permission checks enforced server-side
 - Organization frontend UI — switcher, Members & Invites page, and accept-invite page, all wired to the real endpoints above and manually tested end to end, including a real invite sent and displayed correctly
 - Task attribution — "created by" and "approved by" shown on tasks, backed by real data, not placeholders
+- Dashboard analytics — AI source breakdown, task status breakdown, and activity-over-time charts, all client-side aggregations of existing data, no additional endpoints required
 - Full audit trail of every task event, including which AI layer handled each analysis
 - 50 automated backend tests passing
 
 ## Known limitations
 
-**Amazon Bedrock is currently blocked at the account level** (`ValidationException: Operation not allowed`) — this affects both the Bedrock Playground and API calls, and is not something fixable in code. An AWS Support case is open and escalated. As a result, every agent currently falls through to its **OpenAI layer**, which handles document analysis and planning with real AI — Bedrock is the intended primary provider and works identically once AWS restores access. The deterministic rule-based layer only activates if both AI providers are unavailable. The rest of the system — task management, approvals, payments, signatures, and organizations — is unaffected and fully functional.
+**Amazon Bedrock access was blocked at the AWS account level for most of this project's development** (`ValidationException: Operation not allowed`), with an AWS Support case open throughout. Every agent ran on its OpenAI fallback layer during that period — real AI analysis the whole time, just not the primary provider. By the end of the hackathon, **AWS resolved the restriction and Bedrock access was restored**, with no code changes or redeployment required — the existing three-layer fallback simply began succeeding at its first, primary layer again, exactly as it was designed to.
 
 ---
 
