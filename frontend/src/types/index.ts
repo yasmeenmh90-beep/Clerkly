@@ -57,6 +57,7 @@ export interface User {
   is_active: boolean
   created_at: string
   gmail_connected: boolean
+  docusign_connected: boolean
 }
 
 export interface AccessToken {
