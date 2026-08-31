@@ -1,14 +1,15 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { AlertTriangle, Cpu, Shield } from "lucide-react"
-
+import { AlertTriangle, Cpu, Loader2, Shield } from "lucide-react"
 import ReactECharts from "echarts-for-react"
 import * as echarts from "echarts/core"
 
 import type { Task } from "@/types"
 import { getTasks } from "@/lib/api"
+
+// ── Source metadata ────────────────────────────────────────────────
 
 const SOURCE_LABELS: Record<string, string> = {
   strands: "AWS Bedrock",
@@ -16,65 +17,81 @@ const SOURCE_LABELS: Record<string, string> = {
   deterministic_fallback: "Rule-Based Fallback",
 }
 
-const SOURCE_COLORS: Record<string, string> = {
-  strands: "#a855f7",
-  openai_fallback: "#3b82f6",
-  deterministic_fallback: "#22c55e",
-}
-
-const SOURCE_GRADIENTS: Record<string, [string, string]> = {
-  strands: ["#c084fc", "#a855f7"],
-  openai_fallback: ["#60a5fa", "#3b82f6"],
-  deterministic_fallback: ["#4ade80", "#22c55e"],
-}
-
-const SOURCE_GRADIENTS_DARK: Record<string, [string, string]> = {
-  strands: ["#7e22ce", "#581c87"],
-  openai_fallback: ["#1d4ed8", "#1e3a8a"],
-  deterministic_fallback: ["#15803d", "#14532d"],
+const SOURCE_COLORS: Record<string, { base: string; bright: string; deep: string; glow: string }> = {
+  strands: {
+    base: "#a855f7",
+    bright: "#c084fc",
+    deep: "#7c3aed",
+    glow: "rgba(168, 85, 247, 0.35)",
+  },
+  openai_fallback: {
+    base: "#3b82f6",
+    bright: "#60a5fa",
+    deep: "#2563eb",
+    glow: "rgba(59, 130, 246, 0.35)",
+  },
+  deterministic_fallback: {
+    base: "#10b981",
+    bright: "#34d399",
+    deep: "#059669",
+    glow: "rgba(16, 185, 129, 0.35)",
+  },
 }
 
 const SOURCE_ORDER = ["strands", "openai_fallback", "deterministic_fallback"]
 
-interface ChartEntry {
+// ── Types ──────────────────────────────────────────────────────────
+
+interface SourceEntry {
   name: string
   value: number
-  color: string
-  gradient: [string, string]
-  darkGradient: [string, string]
   sourceKey: string
+  colors: { base: string; bright: string; deep: string; glow: string }
 }
+
+interface EChartsTooltipParams {
+  name: string
+  value: number
+  percent: number
+  color: string
+  marker: string
+}
+
+// ── Component ──────────────────────────────────────────────────────
 
 export function AISourceBreakdown() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
-  // To sync react state with echarts hover
-  const [hoveredIndex, setHoveredIndex] = useState<number>(-1)
-  const [hoveredData, setHoveredData] = useState<ChartEntry | null>(null)
+  const chartRef = useRef<ReactECharts | null>(null)
 
-  useEffect(() => {
-    async function fetchTasks(): Promise<void> {
-      try {
-        setIsLoading(true)
-        setError(null)
-        const data = await getTasks({ page: 1, page_size: 100 })
-        setTasks(data)
-      } catch (err) {
-        console.error("Failed to load AI source breakdown", err)
-        setError("Unable to load AI processing data.")
-      } finally {
-        setIsLoading(false)
-      }
+  // ── Data fetching ──
+
+  const fetchTasks = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const data = await getTasks({ page: 1, page_size: 100 })
+      setTasks(data)
+    } catch (err) {
+      console.error("Failed to load AI source breakdown", err)
+      setError("Unable to load AI processing data.")
+    } finally {
+      setIsLoading(false)
     }
-
-    void fetchTasks()
-    window.addEventListener("task-updated", fetchTasks)
-    return () => window.removeEventListener("task-updated", fetchTasks)
   }, [])
 
-  const chartData = useMemo(() => {
+  useEffect(() => {
+    void fetchTasks()
+
+    const handler = () => void fetchTasks()
+    window.addEventListener("task-updated", handler)
+    return () => window.removeEventListener("task-updated", handler)
+  }, [fetchTasks])
+
+  // ── Computed data ──
+
+  const chartData = useMemo<SourceEntry[]>(() => {
     const counts: Record<string, number> = {}
 
     for (const task of tasks) {
@@ -83,285 +100,331 @@ export function AISourceBreakdown() {
       counts[source] = (counts[source] ?? 0) + 1
     }
 
-    const ordered = SOURCE_ORDER.filter((key) => counts[key] !== undefined)
-    const rest = Object.keys(counts).filter((key) => !SOURCE_ORDER.includes(key))
+    const ordered = SOURCE_ORDER.filter((k) => counts[k] !== undefined)
+    const rest = Object.keys(counts).filter((k) => !SOURCE_ORDER.includes(k))
+
+    const defaultColors = { base: "#94a3b8", bright: "#cbd5e1", deep: "#64748b", glow: "rgba(148,163,184,0.3)" }
 
     return [...ordered, ...rest].map((source) => ({
       name: SOURCE_LABELS[source] ?? source,
       value: counts[source],
-      color: SOURCE_COLORS[source] ?? "#94a3b8",
-      gradient: SOURCE_GRADIENTS[source] ?? ["#94a3b8", "#64748b"],
-      darkGradient: SOURCE_GRADIENTS_DARK[source] ?? ["#475569", "#334155"],
       sourceKey: source,
+      colors: SOURCE_COLORS[source] ?? defaultColors,
     }))
   }, [tasks])
 
-  const totalAnalyzed = useMemo(() => chartData.reduce((sum, entry) => sum + entry.value, 0), [chartData])
+  const totalAnalyzed = useMemo(
+    () => chartData.reduce((sum, e) => sum + e.value, 0),
+    [chartData],
+  )
 
-  const fallbackEntry = useMemo(() => chartData.find((e) => e.sourceKey === "deterministic_fallback"), [chartData])
+  const fallbackEntry = useMemo(
+    () => chartData.find((e) => e.sourceKey === "deterministic_fallback"),
+    [chartData],
+  )
+
   const fallbackRate = useMemo(() => {
     if (totalAnalyzed === 0 || !fallbackEntry) return "0.0"
     return ((fallbackEntry.value / totalAnalyzed) * 100).toFixed(1)
   }, [totalAnalyzed, fallbackEntry])
 
-  // Generate ECharts option for a stacked 3D pie
-  const option = useMemo(() => {
-    const layers = 15;
-    const series = [];
+  // ── ECharts option ──
 
-    // Helper to generate ECharts LinearGradient objects
-    const getGradient = (colors: [string, string]) => {
-      return new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-        { offset: 0, color: colors[0] },
-        { offset: 1, color: colors[1] }
-      ])
-    }
+  const echartsOption = useMemo(() => {
+    if (chartData.length === 0) return {}
 
-    for (let i = 0; i < layers; i++) {
-      const isTop = i === layers - 1;
-      
-      series.push({
-        type: 'pie',
-        radius: ['55%', '85%'],
-        // shift downward to create depth
-        center: ['50%', `calc(45% + ${(layers - i) * 1.5}px)`],
-        silent: !isTop, // only hover top layer
-        animation: isTop, // only animate top layer to save performance
-        data: chartData.map((d) => ({
-          name: d.name,
-          value: d.value,
-          itemStyle: {
-            color: isTop ? getGradient(d.gradient) : getGradient(d.darkGradient),
-            borderWidth: isTop ? 1 : 0,
-            borderColor: isTop ? 'rgba(255,255,255,0.2)' : 'transparent',
-          }
-        })),
-        itemStyle: {
-          borderRadius: 2,
-        },
-        label: {
-          show: isTop,
-          position: 'inside',
-          formatter: (params: { percent: number }) => {
-            if (params.percent < 5) return '';
-            return `{val|${params.percent.toFixed(1)}%}`;
-          },
-          rich: {
-            val: {
-              color: '#fff',
-              fontSize: 12,
-              fontWeight: 'bold',
-              textShadowColor: 'rgba(0,0,0,0.5)',
-              textShadowBlur: 4,
-              textShadowOffsetY: 2
-            }
-          }
-        },
-        labelLine: { show: false },
-        emphasis: {
-          scaleSize: 10,
-          itemStyle: {
-            shadowBlur: 20,
-            shadowColor: 'rgba(0,0,0,0.5)'
-          }
-        }
-      });
-    }
+    // Build gradient for each segment
+    const pieData = chartData.map((entry) => ({
+      name: entry.name,
+      value: entry.value,
+      itemStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: entry.colors.bright },
+          { offset: 1, color: entry.colors.deep },
+        ]),
+        borderColor: "rgba(0,0,0,0.3)",
+        borderWidth: 1,
+        shadowBlur: 12,
+        shadowColor: entry.colors.glow,
+      },
+    }))
+
+    // Shadow ring data (darker, offset below for depth)
+    const shadowData = chartData.map((entry) => ({
+      name: entry.name,
+      value: entry.value,
+      itemStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: entry.colors.deep },
+          { offset: 1, color: "rgba(0,0,0,0.6)" },
+        ]),
+        borderColor: "rgba(0,0,0,0.5)",
+        borderWidth: 0,
+      },
+    }))
 
     return {
-      tooltip: { show: false }, // we use custom react tooltip
-      series
+      tooltip: {
+        trigger: "item" as const,
+        backgroundColor: "rgba(15, 23, 42, 0.95)",
+        borderColor: "rgba(255,255,255,0.08)",
+        borderWidth: 1,
+        padding: [12, 16],
+        textStyle: {
+          color: "#f1f5f9",
+          fontSize: 13,
+          fontFamily: "inherit",
+        },
+        formatter: (params: EChartsTooltipParams) => {
+          return `<div style="font-weight:600;margin-bottom:6px;font-size:14px;color:${params.color}">${params.name}</div>
+                  <div style="color:#cbd5e1;font-size:13px">${params.value} task${params.value === 1 ? "" : "s"} · <b style="color:#f1f5f9">${params.percent.toFixed(1)}%</b></div>`
+        },
+        extraCssText: "border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.4);backdrop-filter:blur(8px);",
+      },
+      series: [
+        // Shadow / depth ring (behind, slightly offset down)
+        {
+          type: "pie" as const,
+          radius: ["46%", "72%"],
+          center: ["50%", "53%"], // shifted down 3% for depth offset
+          silent: true,
+          animation: false,
+          label: { show: false },
+          labelLine: { show: false },
+          data: shadowData,
+          z: 1,
+        },
+        // Main donut ring
+        {
+          type: "pie" as const,
+          radius: ["46%", "72%"],
+          center: ["50%", "50%"],
+          avoidLabelOverlap: true,
+          padAngle: 2,
+          itemStyle: {
+            borderRadius: 6,
+          },
+          label: {
+            show: false,
+          },
+          labelLine: { show: false },
+          emphasis: {
+            scale: true,
+            scaleSize: 8,
+            itemStyle: {
+              shadowBlur: 24,
+              shadowColor: "rgba(0,0,0,0.4)",
+            },
+          },
+          animationType: "scale" as const,
+          animationEasing: "cubicOut" as const,
+          animationDuration: 1000,
+          animationDelay: 200,
+          data: pieData,
+          z: 2,
+        },
+        // Inner subtle highlight ring (to create glass-like inner edge)
+        {
+          type: "pie" as const,
+          radius: ["44%", "46%"],
+          center: ["50%", "50%"],
+          silent: true,
+          animation: false,
+          label: { show: false },
+          labelLine: { show: false },
+          data: [
+            {
+              value: 1,
+              itemStyle: {
+                color: new echarts.graphic.RadialGradient(0.5, 0.5, 1, [
+                  { offset: 0, color: "rgba(255,255,255,0.06)" },
+                  { offset: 1, color: "rgba(255,255,255,0.01)" },
+                ]),
+                borderWidth: 0,
+              },
+            },
+          ],
+          z: 3,
+        },
+      ],
+      // Center text via graphic
+      graphic: [
+        {
+          type: "text" as const,
+          left: "center",
+          top: "43%",
+          style: {
+            text: "TOTAL",
+            fill: "#94a3b8",
+            fontSize: 11,
+            fontWeight: 700 as const,
+            letterSpacing: 3,
+            fontFamily: "inherit",
+          },
+          z: 10,
+        },
+        {
+          type: "text" as const,
+          left: "center",
+          top: "50%",
+          style: {
+            text: String(totalAnalyzed),
+            fill: "#f1f5f9",
+            fontSize: 36,
+            fontWeight: 800 as const,
+            fontFamily: "inherit",
+          },
+          z: 10,
+        },
+      ],
     }
-  }, [chartData])
+  }, [chartData, totalAnalyzed])
 
-  // Listen to echarts events
-  const onEvents = {
-    mouseover: (params: { dataIndex: number }) => {
-      setHoveredIndex(params.dataIndex)
-      setHoveredData(chartData[params.dataIndex])
-    },
-    mouseout: () => {
-      setHoveredIndex(-1)
-      setHoveredData(null)
-    }
-  }
+  // ── Render ──
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="flex h-full flex-col overflow-hidden rounded-xl border border-border/40 bg-card shadow-lg transition-shadow duration-300"
+      className="flex h-full flex-col overflow-hidden rounded-xl border border-border/40 bg-card shadow-lg"
     >
-      <div className="flex items-center gap-3 border-b border-border/40 bg-card p-5">
+      {/* Header */}
+      <div className="flex items-center gap-3 border-b border-border/40 p-5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+          <Cpu className="h-4 w-4 text-primary" />
+        </div>
         <div>
           <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">
             AI Source Breakdown
           </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Distribution of tasks processed by AI sources
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Which AI layer analyzed each document
           </p>
         </div>
       </div>
 
+      {/* Body */}
       <div className="relative flex-1 p-5">
         {isLoading ? (
-          <div className="flex min-h-[400px] items-center justify-center">
-            <Cpu className="h-6 w-6 animate-pulse text-muted-foreground" />
+          <div className="flex min-h-[420px] items-center justify-center">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center gap-3 text-muted-foreground"
+            >
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span className="text-xs">Loading analysis data…</span>
+            </motion.div>
           </div>
         ) : error ? (
-          <div className="flex min-h-[400px] items-center justify-center">
-            <AlertTriangle className="h-5 w-5 text-danger" />
+          <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 p-4 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+            </div>
+            <p className="text-sm font-medium text-foreground">{error}</p>
+            <p className="max-w-[220px] text-xs text-muted-foreground">
+              Check your connection and try refreshing the page.
+            </p>
           </div>
         ) : totalAnalyzed === 0 ? (
-          <div className="flex min-h-[400px] flex-col items-center justify-center text-center">
-            <Cpu className="mb-3 h-8 w-8 text-muted-foreground opacity-50" />
-            <p className="text-sm font-medium text-foreground">0 Tasks Processed</p>
+          <div className="flex min-h-[420px] flex-col items-center justify-center p-4 text-center">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted/50">
+              <Cpu className="h-5 w-5 text-muted-foreground opacity-50" />
+            </div>
+            <p className="text-sm font-medium text-foreground">No AI source data available</p>
+            <p className="mt-1 max-w-[220px] text-xs text-muted-foreground">
+              Upload a document or sync email to see the AI source breakdown.
+            </p>
           </div>
         ) : (
-          <div className="flex h-full flex-col">
-            
-            {/* ── 3D Donut Area ── */}
-            <div className="relative flex min-h-[260px] w-full items-center justify-center">
-              
-              {/* Dynamic ambient glow */}
-              <div
-                className="pointer-events-none absolute left-1/2 top-1/2 h-[220px] w-[220px] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-30 blur-[40px] transition-colors duration-500"
-                style={{
-                  background: hoveredIndex >= 0 ? chartData[hoveredIndex].color : "var(--primary)",
-                  opacity: hoveredIndex >= 0 ? 0.35 : 0.15,
-                }}
+          <div className="flex flex-col gap-5">
+            {/* ── Donut Chart ── */}
+            <div className="relative mx-auto w-full max-w-[320px]">
+              {/* Subtle ambient glow */}
+              <div className="pointer-events-none absolute left-1/2 top-1/2 h-[180px] w-[180px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/10 blur-[50px]" />
+
+              <ReactECharts
+                ref={chartRef}
+                option={echartsOption}
+                style={{ height: 280, width: "100%" }}
+                opts={{ renderer: "canvas" }}
+                notMerge
               />
-
-              {/* Chart container with perspective */}
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="relative h-[280px] w-full max-w-[340px]"
-              >
-                {/* ScaleY creates the 3D isometric perspective */}
-                <div 
-                  className="absolute inset-0"
-                  style={{ 
-                    transform: "scaleY(0.65) scaleX(1.1)", 
-                    transformOrigin: "center center",
-                    filter: "drop-shadow(0px 30px 20px rgba(0,0,0,0.6))"
-                  }}
-                >
-                  <ReactECharts
-                    option={option}
-                    onEvents={onEvents}
-                    style={{ height: '100%', width: '100%' }}
-                    opts={{ renderer: 'svg' }}
-                  />
-                </div>
-
-                {/* ── Center Content ── */}
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center pt-3">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                    Total
-                  </span>
-                  <span className="mt-1 text-4xl font-extrabold tracking-tighter text-foreground drop-shadow-md">
-                    {totalAnalyzed}
-                  </span>
-                </div>
-              </motion.div>
-
-              {/* ── Hover "Current Selection" Card ── */}
-              <AnimatePresence>
-                {hoveredData && (
-                  <motion.div
-                    initial={{ opacity: 0, x: 20, scale: 0.95 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    exit={{ opacity: 0, x: 10, scale: 0.95 }}
-                    transition={{ duration: 0.25, ease: "easeOut" }}
-                    className="pointer-events-none absolute right-0 top-1/2 z-20 flex w-36 -translate-y-1/2 flex-col items-center rounded-xl border border-border/50 bg-card/95 p-3 shadow-2xl backdrop-blur-md"
-                  >
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Current Selection
-                    </span>
-                    <div className="mt-2 flex items-center gap-1.5">
-                      <span
-                        className="h-2 w-2 rounded-full"
-                        style={{ background: hoveredData.color, boxShadow: `0 0 8px ${hoveredData.color}` }}
-                      />
-                      <span className="text-xs font-bold text-foreground">
-                        {hoveredData.name}
-                      </span>
-                    </div>
-                    <span className="mt-2 text-2xl font-bold tracking-tight text-foreground">
-                      {hoveredData.value}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">Tasks</span>
-                    
-                    <div className="mt-3 w-full rounded-md bg-muted/30 py-1.5 text-center border border-border/40">
-                      <span className="text-xs font-bold text-foreground">
-                        {((hoveredData.value / totalAnalyzed) * 100).toFixed(1)}%
-                      </span>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </div>
 
-            {/* ── Legends ── */}
-            <div className="mt-4 grid grid-cols-3 gap-3">
+            {/* ── Source Legend Cards ── */}
+            <div className="space-y-2">
               <AnimatePresence>
                 {chartData.map((entry, i) => {
-                  const pct = totalAnalyzed > 0 ? ((entry.value / totalAnalyzed) * 100).toFixed(1) : "0.0"
+                  const pct =
+                    totalAnalyzed > 0
+                      ? ((entry.value / totalAnalyzed) * 100).toFixed(1)
+                      : "0.0"
+
                   return (
                     <motion.div
                       key={entry.sourceKey}
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4, delay: 0.6 + i * 0.1 }}
-                      className={`flex flex-col rounded-xl border p-3 transition-all duration-300 ${
-                        hoveredIndex === i
-                          ? "border-primary/40 bg-primary/5 shadow-md"
-                          : "border-border/40 bg-card"
-                      }`}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.35, delay: 0.8 + i * 0.08, ease: "easeOut" }}
+                      className="flex items-center gap-3 rounded-lg border border-border/30 bg-muted/5 px-3.5 py-2.5 transition-all duration-200 hover:border-border/60 hover:bg-muted/15"
                     >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="h-2.5 w-2.5 rounded-full"
-                          style={{
-                            background: `linear-gradient(135deg, ${entry.gradient[0]}, ${entry.gradient[1]})`,
-                            boxShadow: `0 0 10px 1px ${entry.color}80`,
-                          }}
-                        />
-                        <span className="text-[11px] font-semibold text-foreground">
-                          {entry.name}
-                        </span>
-                      </div>
-                      
-                      <div className="mt-3 flex items-end justify-between">
-                        <span className="text-xl font-bold text-foreground">{entry.value}</span>
-                        <div className="rounded-md bg-muted/40 px-2 py-1 text-[10px] font-bold text-muted-foreground">
-                          {pct}%
-                        </div>
-                      </div>
+                      {/* Color indicator */}
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{
+                          background: `linear-gradient(135deg, ${entry.colors.bright}, ${entry.colors.deep})`,
+                          boxShadow: `0 0 8px ${entry.colors.glow}`,
+                        }}
+                      />
+
+                      {/* Source name */}
+                      <span className="flex-1 text-sm font-medium text-foreground">
+                        {entry.name}
+                      </span>
+
+                      {/* Count */}
+                      <span className="text-sm tabular-nums text-muted-foreground">
+                        {entry.value}
+                      </span>
+
+                      {/* Percentage */}
+                      <span className="min-w-[44px] text-right text-sm font-semibold tabular-nums text-foreground">
+                        {pct}%
+                      </span>
                     </motion.div>
                   )
                 })}
               </AnimatePresence>
             </div>
 
-            {/* ── Fallback rate ── */}
+            {/* ── Fallback Rate Metric ── */}
             <motion.div
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.9 }}
-              className="relative mt-4 flex items-center justify-between overflow-hidden rounded-xl border border-border/40 bg-card p-4 shadow-sm"
+              transition={{ duration: 0.4, delay: 1.1, ease: "easeOut" }}
+              className="relative overflow-hidden rounded-xl border border-emerald-500/15 bg-gradient-to-r from-emerald-500/5 to-transparent px-4 py-3"
             >
-              <div className="flex items-center gap-4">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-success/10 border border-success/20">
-                  <Shield className="h-5 w-5 text-success" />
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-500/20 bg-emerald-500/10">
+                  <Shield className="h-4 w-4 text-emerald-400" />
                 </div>
-                <div>
-                  <p className="text-xs font-semibold text-foreground">Fallback Rate</p>
-                  <span className="text-2xl font-extrabold text-foreground">{fallbackRate}%</span>
+
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-emerald-400/90">
+                    Fallback Rate
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {fallbackEntry
+                      ? `${fallbackEntry.value} task${fallbackEntry.value === 1 ? "" : "s"} used fallback`
+                      : "No fallback tasks"}
+                  </p>
                 </div>
+
+                <span className="text-xl font-bold tabular-nums tracking-tight text-foreground">
+                  {fallbackRate}%
+                </span>
               </div>
             </motion.div>
           </div>
