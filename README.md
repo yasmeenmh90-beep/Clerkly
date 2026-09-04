@@ -1,6 +1,6 @@
 # Clerkly — AI-Powered Paperwork Agent
 
-Clerkly is an AI agent that reads, understands, and acts on everyday paperwork — documents, emails, payments, and signatures — so people spend less time on administrative busywork.
+Clerkly is an AI agent that reads, understands, and acts on everyday paperwork documents, emails, payments, and signatures so people spend less time on administrative busywork.
 
 Built for the **AWS "Agents for Humans" Hackathon** (Everyday Agents track), using the **Strands Agents SDK**, **Amazon Bedrock**, and **OpenAI**.
 
@@ -8,20 +8,20 @@ Built for the **AWS "Agents for Humans" Hackathon** (Everyday Agents track), usi
 
 ## The problem
 
-Everyday paperwork — renewals, contracts, invoices, registrations — is scattered across email, PDFs, and physical documents. People have to manually read each one, figure out what needs to happen, track deadlines, and follow through. It's tedious and easy to get wrong.
+Everyday paperwork renewals, contracts, invoices, registrations is scattered across email, PDFs, and physical documents. People have to manually read each one, figure out what needs to happen, track deadlines, and follow through. It's tedious and easy to get wrong.
 
 ## What Clerkly does
 
-Clerkly takes paperwork in from three sources — a direct document upload, a connected Gmail inbox, or a manually created task — and runs it through a small pipeline of AI agents that:
+Clerkly takes paperwork in from three sources a direct document upload, a connected Gmail inbox, or a manually created task and runs it through a small pipeline of AI agents that:
 
-1. **Read and understand** the document (what it is, key dates, amounts, required actions)
-2. **Decide what to do next** — some tasks can be handled automatically, others need a human to approve first
-3. **Execute the action** — complete a payment via Stripe, send a document for e-signature via DocuSign, or simply mark the task done
-4. **Keep a daily watch** on anything still pending, so nothing slips through a deadline — and can email that summary directly on request
+1. **Read and understand** -> the document (what it is, key dates, amounts, required actions)
+2. **Decide what to do next** -> some tasks can be handled automatically, others need a human to approve first
+3. **Execute the action** -> complete a payment via Stripe, send a document for e-signature via DocuSign, or simply mark the task done
+4. **Keep a daily watch** ->on anything still pending, so nothing slips through a deadline — and can email that summary directly on request
 
-Every step is logged in an audit trail, and anything involving money or a legal signature always requires human approval before it can complete — that rule is enforced in code, not just prompted to the AI. Every task also shows who created it and who approved it, since a workspace can now have more than one person in it.
+Every step is logged in an audit trail, and anything involving money or a legal signature always requires human approval before it can complete that rule is enforced in code, not just prompted to the AI. Every task also shows who created it and who approved it, since a workspace can now have more than one person in it.
 
-Paperwork and tasks live inside a **workspace (organization)**, not tied to a single account — every new signup gets a personal workspace automatically, and other people can be invited into it by email, with an owner/admin/member role model. Pending invites can be listed, cancelled, or resent, and a member's role can be changed after the fact.
+Paperwork and tasks live inside a **workspace (organization)**, not tied to a single account every new signup gets a personal workspace automatically, and other people can be invited into it by email, with an owner/admin/member role model. Pending invites can be listed, cancelled, or resent, and a member's role can be changed after the fact.
 
 New users are shown the current Terms of Service and Privacy Policy and must accept it before using the app — if the policy is ever updated, anyone whose acceptance is out of date is prompted again automatically.
 
@@ -44,9 +44,11 @@ Clerkly runs three real agents built with the **Strands Agents SDK**:
 
 Each task records which layer actually handled it (`analysis_source` / `plan_source`: `"strands"`, `"openai_fallback"`, or `"deterministic_fallback"`), so it's always clear whether a result came from real AI or the fallback logic. A dashboard chart shows the live breakdown across all three, alongside a task status overview and an activity-over-time chart.
 
-**Safety by design, not by prompt:** a hardcoded check in the execution layer blocks any task requiring payment or signature from completing without explicit human approval first, regardless of what any agent — or which AI provider — decides. This can't be bypassed by a prompt or a model output.
+**Safety by design, not by prompt:** a hardcoded check in the execution layer blocks any task requiring payment or signature from completing without explicit human approval first, regardless of what any agent or which AI provider decides. This can't be bypassed by a prompt or a model output.
 
-**Multi-user by design:** every task, document, and approval belongs to an organization, not an individual account. Access is scoped by organization membership — a member can see and approve any task in their org, cross-org access returns 404 the same way cross-user access always has. Inviting, accepting, listing, cancelling, resending, removing, and role changes are all enforced server-side with owner/admin/member permission checks, not just hidden in the UI — and the frontend (organization switcher, Members & Invites page, accept-invite page) is fully wired to these real endpoints, not mocked data.
+**Multi-user by design:** every task, document, and approval belongs to an organization, not an individual account. Access is scoped by organization membership a member can see and approve any task in their org, cross-org access returns 404 the same way cross-user access always has. Inviting, accepting, listing, cancelling, resending, removing, and role changes are all enforced server-side with owner/admin/member permission checks, not just hidden in the UI and the frontend (organization switcher, Members & Invites page, accept-invite page) is fully wired to these real endpoints, not mocked data.
+
+**Account-portable by design:** nothing in Clerkly's architecture is tied to a specific AWS account only to standard AWS credentials and a model ID. This wasn't a theoretical design goal; it was tested for real (see "The AWS journey" below).
 
 ### Diagrams
 
@@ -60,7 +62,7 @@ Breaks the backend into its functional layers: API routing, security and ownersh
 
 ![Clerkly full system architecture](./clerkly-full-system-architecture.png)
 
-Shows the whole system — frontend, backend, and every external service — and distinguishes three kinds of connections: REST calls, OAuth browser redirects, and webhooks. The key insight: payment and signature confirmation never route through the frontend at all.
+Shows the whole system frontend, backend, and every external service and distinguishes three kinds of connections: REST calls, OAuth browser redirects, and webhooks. The key insight: payment and signature confirmation never route through the frontend at all.
 
 #### Task workflow
 
@@ -76,7 +78,7 @@ Traces a single piece of paperwork from intake through AI analysis, planning, hu
 
 **Integrations:** Stripe (payments) · DocuSign eSignature (sandbox, real signing flow) · Gmail API (OAuth, email intake) · SMTP (invite and digest emails)
 
-**Frontend:** Next.js · Tailwind CSS · Framer Motion · recharts (dashboard analytics)
+**Frontend:** Next.js · Tailwind CSS · Framer Motion · recharts / echarts (dashboard analytics)
 
 ---
 
@@ -109,10 +111,10 @@ You'll need:
 - `OPENAI_API_KEY` — for the second-layer AI fallback (platform.openai.com)
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` — for Gmail intake (Google Cloud Console)
 - `DOCUSIGN_INTEGRATION_KEY` / `DOCUSIGN_SECRET_KEY` / `DOCUSIGN_ACCOUNT_ID` / `DOCUSIGN_REDIRECT_URI` — for signature intake (DocuSign developer sandbox)
-- `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` — for payments (Stripe dashboard, test mode)
+- `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` — for payments (Stripe dashboard, test mode — note the webhook secret changes every time you start a fresh `stripe listen` session locally, so it needs updating each time if you're testing payments)
 - `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM_EMAIL` — for organization invite emails and Paperwork Watch digest emails
 - `CURRENT_POLICY_VERSION` — optional, defaults to `"1.0"`; bump it whenever the Terms/Privacy text actually changes
-- AWS credentials configured locally for Bedrock access (`aws configure` or SSO)
+- Valid AWS credentials configured locally for Bedrock access (`aws configure`), region matching wherever your account has Bedrock model access (this project uses `us-west-2`)
 
 `OPENAI_API_KEY` and `SMTP_*` are both optional — without them, agents skip straight to the deterministic fallback, and invites/digests are still created but not automatically emailed.
 
@@ -133,7 +135,9 @@ Stripe and DocuSign both need a public URL to send webhook events to your local 
 ```bash
 # Stripe
 stripe listen --forward-to localhost:8000/payments/webhook
-
+```
+Copy the `whsec_...` value this prints into `STRIPE_WEBHOOK_SECRET` in `.env`, then restart the backend — this secret is generated fresh every time you start `stripe listen`, so it needs updating each session.
+```bash
 # DocuSign (via ngrok, then register the URL in DocuSign's Connect settings)
 ngrok http 8000
 ```
@@ -153,7 +157,7 @@ npm run dev
 ```
 The app runs at `http://localhost:3000`.
 
-The multi-user UI — organization switcher, Members & Invites page (invite, view, cancel, resend, change roles), and the accept-invite page — is fully built and tested against the real backend, not mock data. Task cards also show who created and who approved each task. The dashboard and Activity page include live charts: AI source breakdown, task status breakdown, and activity volume over time.
+The multi-user UI — organization switcher, Members & Invites page (invite, view, cancel, resend, change roles), and the accept-invite page is fully built and tested against the real backend, not mock data. Task cards also show who created and who approved each task. The dashboard and Activity page include live charts: AI source breakdown, task status breakdown, and activity volume over time.
 
 ---
 
@@ -162,22 +166,32 @@ The multi-user UI — organization switcher, Members & Invites page (invite, vie
 - Account registration and login (JWT), with an organization automatically created for every new user
 - Terms of Service / Privacy Policy acceptance, with automatic re-prompting on version changes
 - Manual task creation, approval, rejection, and execution
-- Document upload → task creation, with real AI analysis (Bedrock, with automatic OpenAI fallback if unreachable)
+- Document upload → task creation, with real AI analysis via Amazon Bedrock (Nova Lite), with automatic OpenAI fallback if Bedrock is unreachable
 - Real uploaded PDF/DOCX files sent to DocuSign for signature, not just a generated text summary
 - Gmail connection and inbox sync into tasks
-- Stripe payments — real Checkout session, real webhook, task auto-completes on payment
-- DocuSign signatures — real OAuth connection, real envelope creation and email delivery, real signing, real webhook confirmation, task auto-completes on signature
-- Paperwork Watch Agent — on-demand daily summary, with the option to email it directly via SMTP
-- Organizations — every user gets a personal workspace; inviting, accepting, listing, cancelling, resending, removing, and changing roles all tested via real HTTP requests, with owner/admin/member permission checks enforced server-side
-- Organization frontend UI — switcher, Members & Invites page, and accept-invite page, all wired to the real endpoints above and manually tested end to end, including a real invite sent and displayed correctly
-- Task attribution — "created by" and "approved by" shown on tasks, backed by real data, not placeholders
-- Dashboard analytics — AI source breakdown, task status breakdown, and activity-over-time charts, all client-side aggregations of existing data, no additional endpoints required
+- Stripe payments -> real Checkout session, real webhook, task auto-completes on payment
+- DocuSign signatures -> real OAuth connection, real envelope creation and email delivery, real signing, real webhook confirmation, task auto-completes on signature
+- Paperwork Watch Agent —> on-demand daily summary, with the option to email it directly via SMTP
+- Organizations —> every user gets a personal workspace; inviting, accepting, listing, cancelling, resending, removing, and changing roles all tested via real HTTP requests, with owner/admin/member permission checks enforced server-side
+- Organization frontend UI —> switcher, Members & Invites page, and accept-invite page, all wired to the real endpoints above and manually tested end to end, including a real invite sent and displayed correctly
+- Task attribution —> "created by" and "approved by" shown on tasks, backed by real data, not placeholders
+- Dashboard analytics —> AI source breakdown, task status breakdown, and activity-over-time charts, all client-side aggregations of existing data, no additional endpoints required
 - Full audit trail of every task event, including which AI layer handled each analysis
 - 50 automated backend tests passing
 
+## The AWS journey — a real test of the fallback design
+
+This project's three-layer AI fallback (Bedrock → OpenAI → deterministic rules) wasn't just a design exercise it was tested by real, unplanned events during development, twice.
+
+**First:** partway through the build, our original AWS account's access to Amazon Bedrock was blocked at the account level (`ValidationException: Operation not allowed`), with an AWS Support case open and no clear resolution timeline. Every agent ran on its OpenAI fallback layer during this period  real AI analysis the entire time, just not the primary intended provider. Bedrock access on that account was later restored by AWS, and the system automatically began succeeding at its primary layer again with no code changes required.
+
+**Second, and closer to submission:** the entire original AWS account was suspended during an unrelated payment-verification review  not a Bedrock issue at all, and again with no guaranteed resolution timeline. Rather than wait, we set up a brand-new AWS account, generated fresh credentials, and requested Bedrock access. Under AWS's current model-access process, Bedrock models activate automatically on first invocation rather than requiring a separate manual approval step. The first real test  a prompt in the Bedrock Playground, followed immediately by an actual document upload through Clerkly itself  succeeded cleanly, with **zero application code changes**. Only local AWS credentials and the `.env` configuration needed updating.
+
+This is the practical proof of the architecture's design goal: nothing in Clerkly is tied to a specific AWS account, a specific API key, or any account-specific configuration baked into the application logic. Swapping the underlying AWS account, even under real deadline pressure, was a credentials update, not a rebuild.
+
 ## Known limitations
 
-**Amazon Bedrock access was blocked at the AWS account level for most of this project's development** (`ValidationException: Operation not allowed`), with an AWS Support case open throughout. Every agent ran on its OpenAI fallback layer during that period — real AI analysis the whole time, just not the primary provider. By the end of the hackathon, **AWS resolved the restriction and Bedrock access was restored**, with no code changes or redeployment required — the existing three-layer fallback simply began succeeding at its first, primary layer again, exactly as it was designed to.
+**Local development credentials need periodic attention.** Since this project has been developed across AWS account changes, local machine changes, and fresh `stripe listen` sessions, anyone picking up local development should double-check `aws sts get-caller-identity` succeeds and that `STRIPE_WEBHOOK_SECRET` in `.env` matches the currently running `stripe listen` session before assuming a payment or Bedrock failure is a code bug rather than a stale local credential.
 
 ---
 
