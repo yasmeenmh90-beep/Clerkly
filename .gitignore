@@ -288,3 +288,4 @@ backend/clerkly_before_task_ownership.db
 !.env.example
 !backend/.env.example
 !frontend/src/lib/
+images/Clerkly.mov
