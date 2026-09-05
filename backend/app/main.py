@@ -20,10 +20,14 @@ from app.api.tasks import router as tasks_router
 from app.api.organizations import (
     router as organizations_router,
 )
-from app.config import settings
+from alembic import command as alembic_command
+from alembic.config import Config
+
+from app.config import BASE_DIR, settings
 from app.database import SessionLocal
-from app.models.organization_record import OrganizationRecord
 from app.models.task_record import TaskRecord
+from app.models.organization_record import OrganizationRecord
+
 
 from app.api.policy import router as policy_router
 logging.basicConfig(
@@ -110,6 +114,15 @@ def seed_initial_task() -> None:
         database.close()
 
 
+def run_migrations() -> None:
+    alembic_cfg = Config(str(BASE_DIR / "alembic.ini"))
+    alembic_cfg.set_main_option(
+        "sqlalchemy.url", settings.database_url
+    )
+    alembic_command.upgrade(alembic_cfg, "head")
+
+
+run_migrations()
 seed_initial_task()
 
 
